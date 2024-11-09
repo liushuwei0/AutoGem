@@ -36,6 +36,11 @@
      ```
      python3 velcmd_to_ackermann.py
      ```
+   
+   - Terminal #4 (For Bird View)
+     ```
+     python3 studentVision_gazebo.py
+     ```
 
 ### Debug
 
