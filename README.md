@@ -2,7 +2,11 @@
 
 ### Usage
 
-1. Download the whole repository
+1. Clone the whole repository
+
+   ```
+
+   ```
 2. Go to current workspace
 
    ```
@@ -15,10 +19,23 @@
    ```
 4. Run Project Simulation
 
-   ```
-   source devel/setup.bash
-   roslaunch gem_launch gem_init.launch world_name:="highbay_track.world" x:=-1.5 y:=-21 yaw:=3.1416
-   ```
+   - Terminal #1
+
+     ```
+     source devel/setup.bash
+     roslaunch gem_launch gem_init.launch world_name:="highbay_track.world" x:=-1.5 y:=-21 yaw:=3.1416
+     ```
+   - Terminal #2
+
+     ```
+     source devel/setup.bash
+     rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+     ```
+   - Terminal #3
+
+     ```
+     python3 velcmd_to_ackermann.py
+     ```
 
 ### Debug
 
