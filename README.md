@@ -5,12 +5,12 @@
 1. Clone the whole repository
 
    ```
-
+   git clone https://github.com/htliang517/ECE484-FA24-CTJ-AutoGem_sim.git
    ```
 2. Go to current workspace
 
    ```
-   cd catkin_ws
+   cd ECE484-FA24-CTJ-AutoGem_sim
    ```
 3. Build the project
 
@@ -19,25 +19,25 @@
    ```
 4. Run Project Simulation
 
-   - Terminal #1
+   - Terminal #1 Launch Gazebo Simulation
 
      ```
      source devel/setup.bash
      roslaunch gem_launch gem_init.launch world_name:="highbay_track.world" x:=-1.5 y:=-21 yaw:=3.1416
      ```
-   - Terminal #2
+   - Terminal #2 Keyboard Controller
 
      ```
      source devel/setup.bash
      rosrun teleop_twist_keyboard teleop_twist_keyboard.py
      ```
-   - Terminal #3
+   - Terminal #3 Node for Comunicating between Topics (#Will be modified to a launch file in the future)
 
      ```
      python3 velcmd_to_ackermann.py
      ```
    
-   - Terminal #4 (For Bird View)
+   - Terminal #4 Lane Detection Testing (#Will be modified to a launch file in the future)
      ```
      python3 studentVision_gazebo.py
      ```
