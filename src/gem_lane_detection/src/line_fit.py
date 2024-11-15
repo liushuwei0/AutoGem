@@ -37,7 +37,7 @@ def line_fit(binary_warped):
 	# Set the width of the windows +/- margin
 	margin = 100
 	# Set minimum number of pixels found to recenter window
-	minpix = 50
+	minpix = 150
 	# Create empty lists to receive left and right lane pixel indices
 	left_lane_inds = []
 	right_lane_inds = []
@@ -68,7 +68,6 @@ def line_fit(binary_warped):
 		cv2.rectangle(out_img,(leftX_L,y_top), (leftX_R, y_bottom), (0,255,0), 3)
 		# ----- Right Half
 		cv2.rectangle(out_img,(rightX_L,y_top), (rightX_R, y_bottom), (255,0,0), 3)
-
 		####
 		# Identify the nonzero pixels in x and y within the window
 		##TO DO
