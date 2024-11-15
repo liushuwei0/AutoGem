@@ -32,10 +32,11 @@ class lanenet_detector():
         self.pub_bird = rospy.Publisher("lane_detection/birdseye", Image, queue_size=1)
 
 
-        self.pub_color_thresh = rospy.Publisher("lane_detection/color_thresh", Image, queue_size=1)
-        self.pub_grad_thresh = rospy.Publisher("lane_detection/grad_thresh", Image, queue_size=1)
-        self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
-
+        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
+        # self.pub_color_thresh = rospy.Publisher("lane_detection/color_thresh", Image, queue_size=1)
+        # self.pub_grad_thresh = rospy.Publisher("lane_detection/grad_thresh", Image, queue_size=1)
+        # self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
+        ######################################################################################
 
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
@@ -81,39 +82,38 @@ class lanenet_detector():
         #####
 
 
+        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
         ##### Test for each functoin
-        grad_image = self.gradient_thresh(raw_img)
-        colorTH_image = self.color_thresh(raw_img)
-        # colorTH_image = self.canny_edge(raw_img)
+        # grad_image = self.gradient_thresh(raw_img)
+        # colorTH_image = self.color_thresh(raw_img)
 
-        combine_image = self.combinedBinaryImage(raw_img)
-        combine_image = (combine_image* 255).astype(np.uint8)
+        # combine_image = self.combinedBinaryImage(raw_img)
+        # combine_image = (combine_image* 255).astype(np.uint8)
 
-        if grad_image is not None:
-            out_grad_img_msg = self.bridge.cv2_to_imgmsg(grad_image, 'mono8')
-            self.pub_grad_thresh.publish(out_grad_img_msg)
-        if colorTH_image is not None:
-            out_colorTH_img_msg = self.bridge.cv2_to_imgmsg(colorTH_image, 'mono8')
-            self.pub_color_thresh.publish(out_colorTH_img_msg)
+        # if grad_image is not None:
+        #     out_grad_img_msg = self.bridge.cv2_to_imgmsg(grad_image, 'mono8')
+        #     self.pub_grad_thresh.publish(out_grad_img_msg)
+        # if colorTH_image is not None:
+        #     out_colorTH_img_msg = self.bridge.cv2_to_imgmsg(colorTH_image, 'mono8')
+        #     self.pub_color_thresh.publish(out_colorTH_img_msg)
 
-        if combine_image is not None:
-            out_combine_img_msg = self.bridge.cv2_to_imgmsg(combine_image, 'mono8')
-            self.pub_combine_thresh.publish(out_combine_img_msg)
-
+        # if combine_image is not None:
+        #     out_combine_img_msg = self.bridge.cv2_to_imgmsg(combine_image, 'mono8')
+        #     self.pub_combine_thresh.publish(out_combine_img_msg)
+        ######################################################################################
 
 
     def gradient_thresh(self, img, thresh_min=120, thresh_max=300):
         """
         Apply sobel edge detection on input image in x, y direction
-        """
         #1. Convert the image to gray scale
         #2. Gaussian blur the image
         #3. Use cv2.Sobel() to find derievatives for both X and Y Axis
         #4. Use cv2.addWeighted() to combine the results
         #5. Convert each pixel to unint8, then apply threshold to get binary image
-
+        """
         ## TODO
-        # # Sobel Filter
+        # # ===== Sobel Filter =====
         # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # blur = cv2.GaussianBlur(gray, (5,5),0)
 
@@ -126,7 +126,7 @@ class lanenet_detector():
 
         # ret, binary_output = cv2.threshold(grad, 50, 255, cv2.THRESH_BINARY)
         
-        # Canny Edge Detection
+        # ===== Canny Edge Detection =====
         # Convert image to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = self.increase_contrast(gray)
@@ -142,19 +142,6 @@ class lanenet_detector():
 
         return binary_output
 
-    # def canny_edge(self, img, thresh_min=100, thresh_max=300):
-    #     # Convert image to grayscale
-    #     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    #     gray = self.increase_contrast(gray)
-    #     # Apply Gaussian blur to reduce noise and improve edge detection
-    #     blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        
-    #     # Use Canny edge detector with provided threshold values
-    #     binary_output = cv2.Canny(blur, thresh_min, thresh_max)
-
-    #     kernel = np.ones((3, 3), np.uint8)
-    #     binary_output = cv2.dilate(binary_output, kernel, iterations=1)
-    #     return binary_output
 
     def increase_contrast(self, gray_img, clip_limit=2, tile_grid_size=(10,10)):
         clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
@@ -180,6 +167,7 @@ class lanenet_detector():
         # ret, binary_output = cv2.threshold(GRY, 15, 255, cv2.THRESH_BINARY)
         # # ret, binary_output = cv2.threshold(GRY, 75, 255, cv2.THRESH_BINARY)
 
+        ### CURRENT VERSION ###
         hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
         L = hls[:,:,1]
         contrast_L = self.increase_contrast(L)
@@ -229,6 +217,8 @@ class lanenet_detector():
         binaryImage = np.zeros_like(SobelOutput)
         binaryImage[(ColorOutput==1) & (SobelOutput==1)] = 1
         # binaryImage[(SobelOutput==1)] = 1
+
+        
         # Remove noise from binary image
         binaryImage = morphology.remove_small_objects(binaryImage.astype('bool'),min_size=200,connectivity=2)
         
