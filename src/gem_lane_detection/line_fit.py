@@ -265,6 +265,22 @@ def bird_fit(binary_warped, ret, save_file=None):
 	cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 255))
 	# cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
 	cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 255))
+######
+	middle_fitx = (left_fitx + right_fitx) / 2
+
+	# 將中間線的 x 和 y 坐標合併為一個 Nx2 的陣列
+	pts_middle = np.array([np.transpose(np.vstack([middle_fitx, ploty]))], dtype=np.int32)
+
+	# Draw the lane onto the warped blank image
+	cv2.polylines(window_img, [pts_middle], isClosed=False, color=(255, 0, 0), thickness=15)
+	wavepoint_idx = [0,int(len(left_fitx)/2),len(left_fitx)-1]
+	#print(f'wavepoint={wavepoint_idx}')
+	wavepoint=[]
+	for i in wavepoint_idx:
+		cv2.circle(window_img, (int(middle_fitx[i]), int(ploty[i])), 25, (0, 0, 255), -1)
+		wavepoint.append((int(middle_fitx[i]), int(ploty[i])))
+	#print(f'wavepoint={wavepoint}')
+######
 	result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
 
 	plt.imshow(result)
@@ -284,11 +300,8 @@ def bird_fit(binary_warped, ret, save_file=None):
 	# plt.gcf().clear()
 ########
 
-
-
-
-
 	return result
+
 
 
 def final_viz(undist, left_fit, right_fit, m_inv):
@@ -299,6 +312,7 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 	ploty = np.linspace(0, undist.shape[0]-1, undist.shape[0])
 	left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
 	right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+	#print(f'left_fitx={len(left_fit)}')
 
 	# Create an image to draw the lines on
 	#warp_zero = np.zeros_like(warped).astype(np.uint8)
@@ -310,15 +324,128 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 	pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
 	pts = np.hstack((pts_left, pts_right))
 
+##########
+	middle_fitx = (left_fitx + right_fitx) / 2
+
+	# 將中間線的 x 和 y 坐標合併為一個 Nx2 的陣列
+	pts_middle = np.array([np.transpose(np.vstack([middle_fitx, ploty]))], dtype=np.int32)
+
+	# 假設 'image' 是目標圖像，繪製中間線
+	#cv2.polylines(color_warp, [pts_middle], isClosed=False, color=(255, 0, 0), thickness=5)  # 使用藍色繪製中間線
+
 	# Draw the lane onto the warped blank image
 	cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+	cv2.polylines(color_warp, [pts_middle], isClosed=False, color=(255, 0, 0), thickness=15)
+	wavepoint_idx = [0,int(len(left_fitx)/2),len(left_fitx)-1]
+	#print(f'wavepoint={wavepoint_idx}')
+	wavepoint=[]
+	for i in wavepoint_idx:
+		#cv2.circle(color_warp, (int(middle_fitx[i]), int(middle_fitx[i])), 25, (0, 0, 255), -1)
+		wavepoint.append((int(middle_fitx[i]), int(ploty[i])))
+	# 	text = f"({int(middle_fitx[i])}, {int(middle_fitx[i])})"  # 定義要顯示的文字
+	# 	font = cv2.FONT_HERSHEY_SIMPLEX  # 字體
+	# 	font_scale = 0.6  # 字體大小
+	# 	color = (0, 0, 0)  # 白色字體
+	# 	thickness = 2  # 字體厚度
+    
+	# 	# 在圖像上指定位置寫文字（可以調整位置，避免與圓點重疊）
+	# 	cv2.putText(color_warp, text, (int(middle_fitx[i]) + 10, int(ploty[i]) - 10), font, font_scale, color, thickness)
+	print(f'wavepoint={wavepoint}')
+	#transfer wavepoint from birdview to real image
+	wavepoints_transformed = [] 
 
+
+
+	# # Generate waypoints from right lane
+	# def get_arc_points(right_fitx, ploty, offset=100):
+	# 	# 先端、中央、先端の3点を取得
+	# 	waypoint_idx = [0, int(len(right_fitx) / 2), len(right_fitx) - 1]
+	# 	waypoints = [(right_fitx[i], ploty[i]) for i in waypoint_idx]
+
+	# 	# 円弧を計算
+	# 	arc_points = []
+	# 	for i in range(len(waypoints) - 1):
+	# 		start_point = waypoints[i]
+	# 		end_point = waypoints[i + 1]
+	# 		num_points = 100  # 円弧上の点の数
+	# 		for t in np.linspace(0, 1, num_points):
+	# 			x = (1 - t) * start_point[0] + t * end_point[0]
+	# 			y = (1 - t) * start_point[1] + t * end_point[1]
+	# 			arc_points.append((x, y))
+
+	# 	# 左側にオフセット
+	# 	offset_arc_points = [(x - offset, y) for (x, y) in arc_points]
+
+	# 	return offset_arc_points
+
+	# def draw_offset_arc(image, right_fitx, ploty, offset=100):
+	# 	offset_arc_points = get_arc_points(right_fitx, ploty, offset)
+	# 	pts = np.array(offset_arc_points, dtype=np.int32)
+	# 	cv2.polylines(image, [pts], isClosed=False, color=(0, 0, 0), thickness=10)
+	# 	return pts
+
+	# pts = draw_offset_arc(color_warp, right_fitx, ploty, offset=230)
+	# wavepoint=[]
+	# wavepoint_idx = [0,int(len(pts)/2),len(pts)-1]
+	# for i in wavepoint_idx:
+	# 	wavepoint.append((int(pts[i][0]), int(pts[i][1])))
+	# print(f'waypoint_black={wavepoint}')
+
+
+
+	# Conversion from px to m
+	#   x: 640 px -> 4.3 m
+	#   y: 480 px -> 10 m
+	# id=0: farest point from gem
+	# id=1: middle point from gem
+	# id=2: nearest point from gem
+	waypoints_m = [] 
+	for (x, y) in wavepoint:
+		x_m = x * 4.3 / 640
+		y_m = y * 10.0 / 480
+		waypoints_m.append((float(x_m), float(y_m)))
+
+	waypoints_m.append((4.3/2, 10.0 + 3.46))
+
+
+
+	for (x, y) in wavepoint:
+		# 將 (x, y) 座標轉換為齊次座標 (x, y, 1)
+		point_homogeneous = np.array([x, y, 1], dtype=np.float32).reshape(3, 1)
+		
+		# 應用逆透視矩陣變換
+		point_transformed = np.dot(m_inv, point_homogeneous)
+		
+		# 轉換回正常的 (x, y) 座標，通過齊次座標除以第三個元素
+		x_transformed = int(point_transformed[0] / point_transformed[2])
+		y_transformed = int(point_transformed[1] / point_transformed[2])
+		
+		# 將轉換後的座標加入新的 waypoints 列表
+		wavepoints_transformed.append((x_transformed, y_transformed))
+	print(f'wavepoint_trans={wavepoints_transformed}')
+
+
+
+##########
 	# Warp the blank back to original image space using inverse perspective matrix (Minv)
 	newwarp = cv2.warpPerspective(color_warp, m_inv, (undist.shape[1], undist.shape[0]))
+##########
+	#print wavepoint on map
+	for (x,y) in wavepoints_transformed:
+		cv2.circle(newwarp, (x,y), 5, (0, 0, 255), -1)
+		text = f"({x}, {y})"  # 定義要顯示的文字
+		font = cv2.FONT_HERSHEY_SIMPLEX  # 字體
+		font_scale = 1  # 字體大小
+		color = (255, 0, 0)  # 白色字體
+		thickness = 2  # 字體厚度
+    
+		# 在圖像上指定位置寫文字（可以調整位置，避免與圓點重疊）
+		cv2.putText(newwarp, text, (x + 10, y - 10), font, font_scale, color, thickness)
+###########
 	# Combine the result with the original image
 	# Convert arrays to 8 bit for later cv to ros image transfer
 	undist = np.array(undist, dtype=np.uint8)
 	newwarp = np.array(newwarp, dtype=np.uint8)
-	result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+	result = cv2.addWeighted(undist, 1, newwarp, 0.8, 0)
 
-	return result
+	return result, waypoints_m

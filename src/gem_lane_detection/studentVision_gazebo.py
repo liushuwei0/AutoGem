@@ -14,6 +14,7 @@ from skimage import morphology
 
 import matplotlib.pyplot as plt
 
+from std_msgs.msg import Float32MultiArray
 
 
 class lanenet_detector():
@@ -28,6 +29,12 @@ class lanenet_detector():
 
         self.pub_image = rospy.Publisher("lane_detection/annotate", Image, queue_size=1)
         self.pub_bird = rospy.Publisher("lane_detection/birdseye", Image, queue_size=1)
+
+        self.pub_waypoints = rospy.Publisher('lane_detection/waypoints', Float32MultiArray, queue_size=1)
+        self.waypoints_msg = Float32MultiArray()
+        # self.waypoints_msg.data = [[0,0],[0,0],[0,0],[0,0]]
+        self.waypoints_msg.data = []
+
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
         self.detected = False
@@ -39,6 +46,10 @@ class lanenet_detector():
         try:
             # Convert a ROS image message into an OpenCV image
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+
+            # plt.imshow(cv_image)
+            # plt.show()
+
         except CvBridgeError as e:
             print(e)
 
@@ -46,7 +57,7 @@ class lanenet_detector():
 
 
         #####
-        mask_image, bird_image = self.detection(raw_img)
+        mask_image, bird_image, waypoints = self.detection(raw_img)
 
         if mask_image is not None and bird_image is not None:
             # Convert an OpenCV image into a ROS image message
@@ -56,6 +67,12 @@ class lanenet_detector():
             # Publish image message in ROS
             self.pub_image.publish(out_img_msg)
             self.pub_bird.publish(out_bird_msg)
+
+            flat_coordinates = [item for sublist in waypoints for item in sublist]
+            self.waypoints_msg.data = flat_coordinates
+            # self.waypoints_msg.data = waypoints
+            self.pub_waypoints.publish(self.waypoints_msg)
+            rospy.loginfo(f"Published coordinates: {self.waypoints_msg.data}")
         #####
 
 
@@ -206,13 +223,20 @@ class lanenet_detector():
         cols_b = cols
 
         # sim
-        src = np.float32([[cols/2 -63, rows/2 +29 ], [cols/2 +63, rows/2 +29],\
-                        [cols/2 -355, rows/2 +169], [cols/2 +355, rows/2 +169]])
+        # src = np.float32([[cols/2 -63, rows/2 +29 ], [cols/2 +63, rows/2 +29],\
+        #                 [cols/2 -355, rows/2 +169], [cols/2 +355, rows/2 +169]])
 
         # rosbag
         # src = np.float32([[cols/2 -95-55, rows/2 +45 ], [cols/2 +95-55, rows/2 +45],\
         #                 [cols/2 -355-55, rows/2 +169], [cols/2 +355-55, rows/2 +169]])
 
+        # gem-gazebo
+        # 5 m x 4 m
+        # src = np.float32([[227, 312], [411, 312],\
+        #                   [10, 480],  [634, 480]])
+        # 10 m x 4 m
+        src = np.float32([[267, 282], [371, 282],\
+                          [10, 480],  [634, 480]])
         dst = np.float32([[0, 0], [cols_b, 0], [0, rows_b], [cols_b, rows_b]])
 
         M = cv2.getPerspectiveTransform(src, dst)
@@ -281,11 +305,11 @@ class lanenet_detector():
             combine_fit_img = None
             if ret is not None:
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
-                combine_fit_img = final_viz(img, left_fit, right_fit, Minv)
+                combine_fit_img, waypoints = final_viz(img, left_fit, right_fit, Minv)
             else:
                 print("Unable to detect lanes")
 
-            return combine_fit_img, bird_fit_img
+            return combine_fit_img, bird_fit_img, waypoints
 
 
 if __name__ == '__main__':
