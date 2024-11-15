@@ -42,6 +42,40 @@
      python3 studentVision_gazebo.py
      ```
 
+
+
+### Test 2024-11-15
+
+1. Run Vision and controller
+
+   - Terminal #1 Launch Gazebo Simulation
+
+     ```
+     source devel/setup.bash
+     roslaunch gem_launch gem_init.launch world_name:="highbay_track.world" x:=-1.5 y:=-21 yaw:=3.1416
+     ```
+   - Terminal #2 studentVision_gazebo
+
+     ```
+     source devel/setup.bash
+     rosrun gem_lane_detection studentVision_gazebo.py
+     ```
+   - Terminal #3 controller
+
+     ```
+     source devel/setup.bash
+     rosrun gem_controller controller.py
+     ```
+   
+   - Terminal #4 Run when you reset the gem position
+     ```
+     source devel/setup.bash
+     rosrun gem_controller set_pos.py --x -1.5 --y -21 --yaw 3.1416
+
+     ```
+
+
+
 ### Debug
 
 ```bash
