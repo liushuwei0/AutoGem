@@ -36,11 +36,26 @@
      ```
      python3 velcmd_to_ackermann.py
      ```
-   
    - Terminal #4 Lane Detection Testing (#Will be modified to a launch file in the future)
+     (If you have problem with this line, check with `chmod +x studentVision.py`)
+
      ```
-     python3 studentVision_gazebo.py
+     source devel/setup.bash
+     rosrun gem_lane_detection studentVision.py
      ```
+
+### Packages Description
+
+* gem_controller
+  Currently stores the velcmd_to_ackermann python file only.
+  #Might combine with control code in the future.
+* gem_lane_detection
+  Contain main code of lane detection.
+* gem_simulator
+  Cloned from "https://github.com/hangcui1201/POLARIS_GEM_e2_Simulator"
+* teleop_twist_keyboard
+  Cloned from "https://github.com/ros-teleop/teleop_twist_keyboard"
+  Used for keyboard control
 
 ### Debug
 
