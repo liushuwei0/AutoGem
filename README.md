@@ -44,9 +44,9 @@
 
 
 
-### Test 2024-11-15
+### Test 2024-11-16
 
-1. Run Vision and controller
+1. Run Vision and controller in Gazebo simulation
 
    - Terminal #1 Launch Gazebo Simulation
 
@@ -74,6 +74,39 @@
 
      ```
 
+
+2. Run Vision and controller in GEM
+
+   - Terminal #1 studentVision
+
+     ```
+     source devel/setup.bash
+     rosrun gem_lane_detection studentVision.py
+     ```
+   - Terminal #2 gem_controller
+
+     ```
+     source devel/setup.bash
+     rosrun gem_controller gem_controller.py
+     ```
+   
+
+3. Run controller without Vision
+
+    - Terminal in Gazebo: Run predefined_controller (when you do not use controller.py)
+     ```
+     source devel/setup.bash
+     rosrun gem_controller predefined_controller.py
+
+     ```
+
+
+    - Terminal in GEM: Run predefined_gem_controller (when you do not use gem_controller)
+     ```
+     source devel/setup.bash
+     rosrun gem_controller predefined_gem_controller.py
+
+     ```
 
 
 ### Debug
