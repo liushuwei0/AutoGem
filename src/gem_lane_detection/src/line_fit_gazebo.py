@@ -358,47 +358,12 @@ def final_viz(undist, left_fit, right_fit, m_inv):
     
 	# 	# 在圖像上指定位置寫文字（可以調整位置，避免與圓點重疊）
 	# 	cv2.putText(color_warp, text, (int(middle_fitx[i]) + 10, int(ploty[i]) - 10), font, font_scale, color, thickness)
-	print(f'waypoint={waypoint}')
+	# print(f'waypoint={waypoint}')
 	#transfer waypoint from birdview to real image
 	waypoints_transformed = [] 
 
 
 
-	# # Generate waypoints from right lane
-	# def get_arc_points(right_fitx, ploty, offset=100):
-	# 	# 先端、中央、先端の3点を取得
-	# 	waypoint_idx = [0, int(len(right_fitx) / 2), len(right_fitx) - 1]
-	# 	waypoints = [(right_fitx[i], ploty[i]) for i in waypoint_idx]
-
-	# 	# 円弧を計算
-	# 	arc_points = []
-	# 	for i in range(len(waypoints) - 1):
-	# 		start_point = waypoints[i]
-	# 		end_point = waypoints[i + 1]
-	# 		num_points = 100  # 円弧上の点の数
-	# 		for t in np.linspace(0, 1, num_points):
-	# 			x = (1 - t) * start_point[0] + t * end_point[0]
-	# 			y = (1 - t) * start_point[1] + t * end_point[1]
-	# 			arc_points.append((x, y))
-
-	# 	# 左側にオフセット
-	# 	offset_arc_points = [(x - offset, y) for (x, y) in arc_points]
-
-	# 	return offset_arc_points
-
-	# def draw_offset_arc(image, right_fitx, ploty, offset=100):
-	# 	offset_arc_points = get_arc_points(right_fitx, ploty, offset)
-	# 	pts = np.array(offset_arc_points, dtype=np.int32)
-	# 	cv2.polylines(image, [pts], isClosed=False, color=(0, 0, 0), thickness=10)
-	# 	return pts
-
-	# # Road width: 3.1m, 960px => Half width: 1.55m, 480px
-	# pts = draw_offset_arc(color_warp, right_fitx, ploty, offset=480)
-	# waypoint=[]
-	# waypoint_idx = [0,int(len(pts)/2),len(pts)-1]
-	# for i in waypoint_idx:
-	# 	waypoint.append((int(pts[i][0]), int(pts[i][1])))
-	# print(f'waypoint_black={waypoint}')
 	def get_arc_points(right_fitx, ploty, offset):	
 		waypoint_idx = np.linspace(0, len(right_fitx)-1, 50, dtype=int)
 		waypoints = [(right_fitx[i], ploty[i]) for i in waypoint_idx]
@@ -416,10 +381,10 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 
 			# 法線方向にオフセットを適用
 			# offset_point = curr_point + offset * normal
-			#   x: 1280 px -> 4.1 m
-			#   y: 720 px -> 10.3 m
-			# 720/10.3*4.1/1280 = 0.2239
-			offset_point = curr_point + [offset * normal[0], offset * normal[1] * 0.2239]
+			#   x: 640 px -> 4.3 m
+			#   y: 480 px -> 10.0 m
+			# 480/10.0*4.3/640 = 0.3225
+			offset_point = curr_point + [offset * normal[0], offset * normal[1] * 0.3225]
 			offset_arc_points.append(tuple(offset_point))
 
 		return offset_arc_points
@@ -433,8 +398,8 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 	# Gazebo --- Road width: 3.1m, 460px => Half width: 1.55m, 230px
 	# GEM --- Road width: 3.1m, 960px => Half width: 1.55m, 480px
 
-	offset = 480 # for right lane: left offset from original lane
-	if right_fitx[-1] < 1280/2: # the closest point of lane is on the left side
+	offset = 230 # for right lane: left offset from original lane
+	if right_fitx[-1] < 640/2: # the closest point of lane is on the left side
 		offset = -offset # for left lane: right offset from original lane
 
 	pts = draw_offset_arc(color_warp, right_fitx, ploty, offset)
@@ -446,20 +411,21 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 	# print(f'waypoint_black={waypoint}')
 
 
+
 	# Conversion from px to m
-	#   x: 1280 px -> 4.1 m
-	#   y: 720 px -> 10.3 m
+	#   x: 640 px -> 4.3 m
+	#   y: 480 px -> 10.0 m
 	# id=0: farest point from gem
 	# id=1: middle point from gem
 	# id=2: nearest point from gem
 	waypoints_m = [] 
 	for (x, y) in waypoint:
-		x_m = x * 4.1 / 1280
-		y_m = y * 10.3 / 720
+		x_m = x * 4.3 / 640
+		y_m = y * 10.0 / 480
 		waypoints_m.append((float(x_m), float(y_m)))
 
 	# id=3: gem position
-	waypoints_m.append((4.1/2, 10.3 + 3.46))
+	waypoints_m.append((4.3/2, 10.0 + 3.46))
 
 
 

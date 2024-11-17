@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 import rospy
 
-from line_fit import line_fit, tune_fit, bird_fit, final_viz
+from line_fit_gazebo import line_fit, tune_fit, bird_fit, final_viz
 from Line import Line
 from sensor_msgs.msg import Image
 from std_msgs.msg import Header
@@ -74,7 +74,7 @@ class lanenet_detector():
             self.waypoints_msg.data = flat_coordinates
             # self.waypoints_msg.data = waypoints
             self.pub_waypoints.publish(self.waypoints_msg)
-            rospy.loginfo(f"Published coordinates: {self.waypoints_msg.data}")
+            # rospy.loginfo(f"Published coordinates: {self.waypoints_msg.data}")
         #####
 
 

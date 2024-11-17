@@ -71,12 +71,12 @@ class vehicleController():
         return vel
 
     def longititudal_controller(self):
-        curr_x, curr_y = self.waypoints[3]
+        curr_x, curr_y = self.waypoints[-1]
 
         wp1_x,   wp1_y = self.waypoints[1]
         wp2_x,   wp2_y = self.waypoints[0]
 
-        vec1_x, vec1_y = wp1_x - curr_x, wp1_y - curr_y
+        vec1_x, vec1_y =             0, wp1_y - curr_y
         vec2_x, vec2_y = wp2_x - wp1_x, wp2_y - wp1_y
 
         dot_product = vec1_x * vec2_x + vec1_y * vec2_y
@@ -93,52 +93,76 @@ class vehicleController():
         else:
             target_velocity = self.desired_speed * cos_theta
 
+        if target_velocity < 0.3:
+            target_velocity = 0.3
+
         return target_velocity
 
 
 	# Task 3: Lateral Controller (Pure Pursuit)
     def pure_pursuit_lateral_controller(self):
         # curr - wp0 - wp1 - wp2:Farest from the vehicle
-        curr_x, curr_y = self.waypoints[3]
-        wp0_x,   wp0_y = self.waypoints[2]
-        wp1_x,   wp1_y = self.waypoints[1]
+        curr_x, curr_y = self.waypoints[-1]
+        wp0_x,   wp0_y = self.waypoints[-2]
+        wp1_x,   wp1_y = self.waypoints[-3]
         wp2_x,   wp2_y = self.waypoints[0]
 
+
+        # Look at nearest point for steep curve
+        vec2_x, vec2_y = wp0_x - curr_x, -(wp0_y - curr_y)
+        angle_curr_to_wp0  = np.arctan2(vec2_y, vec2_x)
+
+        ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
+        alpha1 = angle_curr_to_wp0 - np.pi/2
+
+
+        # # Look at x- nearest point
+        # if (wp2_x > curr_x and wp0_x < curr_x) or (wp2_x < curr_x and wp0_x > curr_x):
+        #     # idx = np.argmin(np.abs(np.array(self.waypoints[0:-1][0]) - curr_x))
+        #     wp0_x,   wp0_y = self.waypoints[-3]
+
+        #     vec2_x, vec2_y = wp0_x - curr_x, -(wp0_y - curr_y)
+        #     angle_curr_to_wp0  = np.arctan2(vec2_y, vec2_x)
+
+        #     ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
+        #     alpha1 = angle_curr_to_wp0 - np.pi/2
+
+
+        # Look at 1st-2nd nearest points
+        # vec1_x, vec1_y =              0, -(wp0_y - curr_y)
+        # vec2_x, vec2_y = wp1_x -  wp0_x, -(wp1_y -  wp0_y)
+
+        # angle_curr_to_wp0 = np.arctan2(vec1_y, vec1_x)  
+        # angle_wp0_to_wp1  = np.arctan2(vec2_y, vec2_x)  
+
+        # ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
+        # alpha1 = angle_wp0_to_wp1 - angle_curr_to_wp0
+        # print("a1", alpha1)
+
+
+        # Look at farest point for stable crouse
         # vec1_x, vec1_y =              0, -(wp1_y - curr_y)
         # vec2_x, vec2_y = wp2_x -  wp1_x, -(wp2_y -  wp1_y)
-        # # vec2_x, vec2_y = wp1_x -  wp0_x, -(wp1_y -  wp0_y)
 
-        # angle_wp0_to_wp1 = np.arctan2(vec1_y, vec1_x)  
+        # angle_curr_to_wp1 = np.arctan2(vec1_y, vec1_x)  
         # angle_wp1_to_wp2 = np.arctan2(vec2_y, vec2_x)  
 
-        # ld = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
-        # alpha = angle_wp1_to_wp2 - angle_wp0_to_wp1
+        # ld2 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
+        # alpha2 = angle_wp1_to_wp2 - angle_curr_to_wp1
 
 
-
-        vec1_x, vec1_y =              0, -(wp0_y - curr_y)
-        vec2_x, vec2_y = wp1_x -  wp0_x, -(wp1_y -  wp0_y)
-
-        angle_curr_to_wp0 = np.arctan2(vec1_y, vec1_x)  
-        angle_wp0_to_wp1  = np.arctan2(vec2_y, vec2_x)  
-
-        ld = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
-        alpha = angle_wp0_to_wp1 - angle_curr_to_wp0
-
-        if alpha > 0.1:
-            vec1_x, vec1_y =              0, -(wp1_y - curr_y)
-            vec2_x, vec2_y = wp2_x -  wp1_x, -(wp2_y -  wp1_y)
-
-            angle_curr_to_wp1 = np.arctan2(vec1_y, vec1_x)  
-            angle_wp1_to_wp2 = np.arctan2(vec2_y, vec2_x)  
-
-            ld = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
-            alpha = angle_wp1_to_wp2 - angle_curr_to_wp1
-
-
+        # alpha = alpha2 if abs(alpha2) < abs(alpha1) else alpha1
+        # ld = ld1 if alpha == alpha1 else ld2
+        alpha = alpha1
+        ld = ld1
 
         alpha = np.arctan2(np.sin(alpha), np.cos(alpha))   # Normalize alpha to the range [-pi, pi]
         target_steering = np.arctan(2 * self.L * np.sin(alpha) / ld)
+
+        if target_steering > np.radians(35):
+            target_steering = np.radians(35)
+        if target_steering < np.radians(-35):
+            target_steering = np.radians(-35)
 
         return target_steering
 
@@ -166,8 +190,8 @@ class vehicleController():
 
             target_velocity = self.longititudal_controller()
             target_steering = self.pure_pursuit_lateral_controller()
-            # target_velocity = 1
-            # target_steering = 1.1
+            # target_velocity = 0.5
+            # target_steering = 0.0
 
 
             # # Heading angle [rad] to Steering wheel[deg](-630 to 630 deg)
