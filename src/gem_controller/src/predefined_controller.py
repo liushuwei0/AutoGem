@@ -24,7 +24,7 @@ from gazebo_msgs.srv import GetModelState, GetModelStateResponse
 class vehicleController():
 
     def __init__(self):
-        self.rate = rospy.Rate(100) # 100 Hz
+        self.rate = rospy.Rate(10)
 
         # Publisher to publish the control input to the vehicle model
         self.controlPub = rospy.Publisher("/ackermann_cmd", AckermannDrive, queue_size=1)
@@ -42,11 +42,6 @@ class vehicleController():
         self.ackermann_msg.acceleration            = 0.0
         self.ackermann_msg.steering_angle          = 0.0
 
-        rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.callback)
-        self.waypoints = [[2.0,0.0],[2.0,7.5],[2.0,15.0],[2.0,17.0]]
-
-    def callback(self, msg):
-        self.waypoints = [(msg.data[i], msg.data[i+1]) for i in range(0, len(msg.data), 2)]
 
     def getModelState(self):
         # Get the current state of the vehicle
@@ -70,78 +65,6 @@ class vehicleController():
         vel = np.sqrt(vel_x**2 + vel_y**2)  
         return vel
 
-    def longititudal_controller(self):
-        curr_x, curr_y = self.waypoints[3]
-
-        wp1_x,   wp1_y = self.waypoints[1]
-        wp2_x,   wp2_y = self.waypoints[0]
-
-        vec1_x, vec1_y = wp1_x - curr_x, wp1_y - curr_y
-        vec2_x, vec2_y = wp2_x - wp1_x, wp2_y - wp1_y
-
-        dot_product = vec1_x * vec2_x + vec1_y * vec2_y
-
-        # magnitudes of the vectors
-        mag1 = np.sqrt(vec1_x**2 + vec1_y**2)
-        mag2 = np.sqrt(vec2_x**2 + vec2_y**2)
-
-        # cosine of the angle between the two vectors
-        cos_theta = dot_product / (mag1 * mag2)
-
-        if cos_theta > 0.98:  # Near straight, 1 for "straightness"
-            target_velocity = self.desired_speed
-        else:
-            target_velocity = self.desired_speed * cos_theta
-
-        return target_velocity
-
-
-	# Task 3: Lateral Controller (Pure Pursuit)
-    def pure_pursuit_lateral_controller(self):
-        # curr - wp0 - wp1 - wp2:Farest from the vehicle
-        curr_x, curr_y = self.waypoints[3]
-        wp0_x,   wp0_y = self.waypoints[2]
-        wp1_x,   wp1_y = self.waypoints[1]
-        wp2_x,   wp2_y = self.waypoints[0]
-
-        # vec1_x, vec1_y =              0, -(wp1_y - curr_y)
-        # vec2_x, vec2_y = wp2_x -  wp1_x, -(wp2_y -  wp1_y)
-        # # vec2_x, vec2_y = wp1_x -  wp0_x, -(wp1_y -  wp0_y)
-
-        # angle_wp0_to_wp1 = np.arctan2(vec1_y, vec1_x)  
-        # angle_wp1_to_wp2 = np.arctan2(vec2_y, vec2_x)  
-
-        # ld = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
-        # alpha = angle_wp1_to_wp2 - angle_wp0_to_wp1
-
-
-
-        vec1_x, vec1_y =              0, -(wp0_y - curr_y)
-        vec2_x, vec2_y = wp1_x -  wp0_x, -(wp1_y -  wp0_y)
-
-        angle_curr_to_wp0 = np.arctan2(vec1_y, vec1_x)  
-        angle_wp0_to_wp1  = np.arctan2(vec2_y, vec2_x)  
-
-        ld = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
-        alpha = angle_wp0_to_wp1 - angle_curr_to_wp0
-
-        if alpha > 0.1:
-            vec1_x, vec1_y =              0, -(wp1_y - curr_y)
-            vec2_x, vec2_y = wp2_x -  wp1_x, -(wp2_y -  wp1_y)
-
-            angle_curr_to_wp1 = np.arctan2(vec1_y, vec1_x)  
-            angle_wp1_to_wp2 = np.arctan2(vec2_y, vec2_x)  
-
-            ld = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
-            alpha = angle_wp1_to_wp2 - angle_curr_to_wp1
-
-
-
-        alpha = np.arctan2(np.sin(alpha), np.cos(alpha))   # Normalize alpha to the range [-pi, pi]
-        target_steering = np.arctan(2 * self.L * np.sin(alpha) / ld)
-
-        return target_steering
-
     def front2steer(self, f_angle):
         if(f_angle > 35):
             f_angle = 35
@@ -157,17 +80,37 @@ class vehicleController():
         return steer_angle
 
     def execute(self):
+
+        rospy.sleep(1)        
+
+        start_time = rospy.Time.now().to_sec()
+
         while not rospy.is_shutdown():
-            self.rate.sleep()  # Wait a while before trying to get a new state
+
+            end_time = rospy.Time.now().to_sec()
+            elapsed_time = round(end_time - start_time, 1)
+
+            print("Time elapsed: ", elapsed_time)
+            if elapsed_time < 33.4:
+                target_velocity = 1 # m/s
+                target_steering = 0 # rad
+            elif elapsed_time < 54:
+                target_velocity = 1 # m/s
+                target_steering = 0.38 # rad
+            elif elapsed_time < 61.2:
+                target_velocity = 1 # m/s
+                target_steering = -0.38 # rad
+            elif elapsed_time < 80:
+                target_velocity = 1 # m/s
+                target_steering = 0 # rad
+            else:
+                target_velocity = 0 # m/s
+                target_steering = 0 # rad
+
 
             currState =  self.getModelState()
             curr_vel  = self.extract_vehicle_info(currState)
             # print("curr_vel", curr_vel)
-
-            target_velocity = self.longititudal_controller()
-            target_steering = self.pure_pursuit_lateral_controller()
-            # target_velocity = 1
-            # target_steering = 1.1
 
 
             # # Heading angle [rad] to Steering wheel[deg](-630 to 630 deg)
@@ -196,6 +139,7 @@ class vehicleController():
 
             self.controlPub.publish(self.ackermann_msg)
 
+            self.rate.sleep()  # Wait a while before trying to get a new state
 
 def pure_pursuit():
 
