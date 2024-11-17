@@ -32,11 +32,10 @@ class lanenet_detector():
         self.pub_bird = rospy.Publisher("lane_detection/birdseye", Image, queue_size=1)
 
 
-        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
         # self.pub_color_thresh = rospy.Publisher("lane_detection/color_thresh", Image, queue_size=1)
         # self.pub_grad_thresh = rospy.Publisher("lane_detection/grad_thresh", Image, queue_size=1)
-        # self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
-        ######################################################################################
+        self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
+
 
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
@@ -53,6 +52,12 @@ class lanenet_detector():
             print(e)
 
         raw_img = cv_image.copy()
+
+        # ===== Uncomment for saving test view to get transformation matrix =====
+        # cv2.imwrite('test.png', raw_img)
+        # print("Finish! Please Ctrl+C to terminate the program.")
+        # input()
+        # =======================================================================
 
         rows, cols, _ = raw_img.shape
         x_clip = int(cols//5)
@@ -82,13 +87,12 @@ class lanenet_detector():
         #####
 
 
-        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
         ##### Test for each functoin
         # grad_image = self.gradient_thresh(raw_img)
         # colorTH_image = self.color_thresh(raw_img)
 
-        # combine_image = self.combinedBinaryImage(raw_img)
-        # combine_image = (combine_image* 255).astype(np.uint8)
+        combine_image = self.combinedBinaryImage(raw_img)
+        combine_image = (combine_image* 255).astype(np.uint8)
 
         # if grad_image is not None:
         #     out_grad_img_msg = self.bridge.cv2_to_imgmsg(grad_image, 'mono8')
@@ -97,23 +101,24 @@ class lanenet_detector():
         #     out_colorTH_img_msg = self.bridge.cv2_to_imgmsg(colorTH_image, 'mono8')
         #     self.pub_color_thresh.publish(out_colorTH_img_msg)
 
-        # if combine_image is not None:
-        #     out_combine_img_msg = self.bridge.cv2_to_imgmsg(combine_image, 'mono8')
-        #     self.pub_combine_thresh.publish(out_combine_img_msg)
-        ######################################################################################
+        if combine_image is not None:
+            out_combine_img_msg = self.bridge.cv2_to_imgmsg(combine_image, 'mono8')
+            self.pub_combine_thresh.publish(out_combine_img_msg)
 
 
-    def gradient_thresh(self, img, thresh_min=120, thresh_max=300):
+
+    def gradient_thresh(self, img, thresh_min=100, thresh_max=300):
         """
         Apply sobel edge detection on input image in x, y direction
+        """
         #1. Convert the image to gray scale
         #2. Gaussian blur the image
         #3. Use cv2.Sobel() to find derievatives for both X and Y Axis
         #4. Use cv2.addWeighted() to combine the results
         #5. Convert each pixel to unint8, then apply threshold to get binary image
-        """
+
         ## TODO
-        # # ===== Sobel Filter =====
+        # # Sobel Filter
         # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # blur = cv2.GaussianBlur(gray, (5,5),0)
 
@@ -126,7 +131,7 @@ class lanenet_detector():
 
         # ret, binary_output = cv2.threshold(grad, 50, 255, cv2.THRESH_BINARY)
         
-        # ===== Canny Edge Detection =====
+        # Canny Edge Detection
         # Convert image to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = self.increase_contrast(gray)
@@ -167,7 +172,6 @@ class lanenet_detector():
         # ret, binary_output = cv2.threshold(GRY, 15, 255, cv2.THRESH_BINARY)
         # # ret, binary_output = cv2.threshold(GRY, 75, 255, cv2.THRESH_BINARY)
 
-        ### CURRENT VERSION ###
         hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
         L = hls[:,:,1]
         contrast_L = self.increase_contrast(L)
@@ -217,8 +221,6 @@ class lanenet_detector():
         binaryImage = np.zeros_like(SobelOutput)
         binaryImage[(ColorOutput==1) & (SobelOutput==1)] = 1
         # binaryImage[(SobelOutput==1)] = 1
-
-        
         # Remove noise from binary image
         binaryImage = morphology.remove_small_objects(binaryImage.astype('bool'),min_size=200,connectivity=2)
         
@@ -248,7 +250,9 @@ class lanenet_detector():
         # rosbag
         # src = np.float32([[cols/2 -95-55, rows/2 +45 ], [cols/2 +95-55, rows/2 +45],\
         #                 [cols/2 -355-55, rows/2 +169], [cols/2 +355-55, rows/2 +169]])
-        src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
+        # src = np.float32([[510,416],[710,416],[200,717],[1056,717]]) >>> Ortiginal 
+
+        src = np.float32([[410,516],[810,516],[200,717],[1056,717]])
 
         dst = np.float32([[0, 0], [cols_b, 0], [0, rows_b], [cols_b, rows_b]])
 
@@ -289,14 +293,14 @@ class lanenet_detector():
                     left_lane_inds = ret['left_lane_inds']
                     right_lane_inds = ret['right_lane_inds']
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+                    # left_fit = self.left_line.add_fit(left_fit)
+                    # right_fit = self.right_line.add_fit(right_fit)
 
                     self.detected = True
 
             else:
-                left_fit = self.left_line.get_fit()
-                right_fit = self.right_line.get_fit()
+                # left_fit = self.left_line.get_fit()
+                # right_fit = self.right_line.get_fit()
                 # ret = tune_fit(img_birdeye, left_fit, right_fit)
                 ret = line_fit(img_birdeye)
                 if ret is not None:
@@ -307,8 +311,8 @@ class lanenet_detector():
                     left_lane_inds = ret['left_lane_inds']
                     right_lane_inds = ret['right_lane_inds']
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+                    # left_fit = self.left_line.add_fit(left_fit)
+                    # right_fit = self.right_line.add_fit(right_fit)
 
                 else:
                     self.detected = False
