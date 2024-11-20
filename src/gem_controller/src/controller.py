@@ -28,7 +28,10 @@ class vehicleController():
 
         # Publisher to publish the control input to the vehicle model
         self.controlPub = rospy.Publisher("/ackermann_cmd", AckermannDrive, queue_size=1)
+
+        # GEM e2
         self.L = 1.75  # Wheelbase, can be get from gem_control.py
+ 
         self.log_acceleration = True  # Set to True to log acceleration
         self.acceleration_list = []
 
@@ -116,6 +119,15 @@ class vehicleController():
         alpha1 = angle_curr_to_wp0 - np.pi/2
 
 
+
+        vec3_x, vec3_y = wp2_x -  curr_x, -(wp2_y -  curr_y)
+        angle_curr_to_wp2  = np.arctan2(vec3_y, vec3_x)
+        alpha2 = angle_curr_to_wp2 - np.pi/2
+
+        if alpha1*alpha2 < 0 and abs(alpha1) > 0.1:
+            alpha1 = alpha2 * 0.5
+
+
         # # Look at x- nearest point
         # if (wp2_x > curr_x and wp0_x < curr_x) or (wp2_x < curr_x and wp0_x > curr_x):
         #     # idx = np.argmin(np.abs(np.array(self.waypoints[0:-1][0]) - curr_x))
@@ -190,9 +202,8 @@ class vehicleController():
 
             target_velocity = self.longititudal_controller()
             target_steering = self.pure_pursuit_lateral_controller()
-            # target_velocity = 0.5
-            # target_steering = 0.0
 
+            target_velocity = 1.0
 
             # # Heading angle [rad] to Steering wheel[deg](-630 to 630 deg)
             target_steering = np.degrees(target_steering)

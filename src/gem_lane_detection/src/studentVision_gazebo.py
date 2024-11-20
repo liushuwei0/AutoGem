@@ -6,17 +6,15 @@ import numpy as np
 import cv2
 import rospy
 
-from line_fit_gazebo import line_fit, tune_fit, bird_fit, final_viz
+from line_fit_gazebo import line_fit, tune_fit, bird_fit, final_viz, viz1
 from Line import Line
 from sensor_msgs.msg import Image
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Float32MultiArray
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32
 from skimage import morphology
 
 import matplotlib.pyplot as plt
-
-from std_msgs.msg import Float32MultiArray
 
 
 class lanenet_detector():
@@ -31,10 +29,14 @@ class lanenet_detector():
 
         self.pub_image = rospy.Publisher("lane_detection/annotate", Image, queue_size=1)
         self.pub_bird = rospy.Publisher("lane_detection/birdseye", Image, queue_size=1)
+        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
+        # self.pub_color_thresh = rospy.Publisher("lane_detection/color_thresh", Image, queue_size=1)
+        # self.pub_grad_thresh = rospy.Publisher("lane_detection/grad_thresh", Image, queue_size=1)
+        self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
+        ######################################################################################
 
         self.pub_waypoints = rospy.Publisher('lane_detection/waypoints', Float32MultiArray, queue_size=1)
         self.waypoints_msg = Float32MultiArray()
-        # self.waypoints_msg.data = [[0,0],[0,0],[0,0],[0,0]]
         self.waypoints_msg.data = []
 
         self.left_line = Line(n=5)
@@ -57,6 +59,25 @@ class lanenet_detector():
 
         raw_img = cv_image.copy()
 
+        # ===== Uncomment for saving test view to get transformation matrix =====
+        # cv2.imwrite('test.png', raw_img)
+        # print("Finish! Please Ctrl+C to terminate the program.")
+        # input()
+        # =======================================================================
+
+        rows, cols, _ = raw_img.shape
+        x_clip = int(cols//5)
+        y_clip = int(rows//2)
+        # y_clip = 3*int(rows//5)
+
+        raw_img[:y_clip, :] = [60, 60, 60]
+        raw_img[:, :x_clip] = [60, 60, 60]
+        raw_img[:, 4*x_clip:] = [60, 60, 60]
+
+        # cv2.imwrite("test.png", raw_img)
+        # time.sleep(10000000)
+
+
 
         #####
         mask_image, bird_image, waypoints = self.detection(raw_img)
@@ -70,37 +91,36 @@ class lanenet_detector():
             self.pub_image.publish(out_img_msg)
             self.pub_bird.publish(out_bird_msg)
 
+            # Publish waypoints
             flat_coordinates = [item for sublist in waypoints for item in sublist]
             self.waypoints_msg.data = flat_coordinates
-            # self.waypoints_msg.data = waypoints
             self.pub_waypoints.publish(self.waypoints_msg)
-            # rospy.loginfo(f"Published coordinates: {self.waypoints_msg.data}")
+            # print("Published coordinates: ", self.waypoints_msg.data)
         #####
 
 
+        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
         ##### Test for each functoin
-        # # mask_image = self.gradient_thresh(raw_img)
-        # # bird_image = self.color_thresh(raw_img)
-        # mask_image = self.combinedBinaryImage(raw_img)
-        # mask_image = np.uint8(mask_image * 255)
-        # bird_image, M, Minv = self.perspective_transform(mask_image)
-        # bird_image = np.uint8(bird_image * 255)
-        # # _, bird_image = self.detection(raw_img)
-        # if mask_image is not None and bird_image is not None:
-        #     # Convert an OpenCV image into a ROS image message
-        #     # out_img_msg = self.bridge.cv2_to_imgmsg(mask_image, 'bgr8')
-        #     out_img_msg = self.bridge.cv2_to_imgmsg(mask_image, 'mono8')
-        #     # out_bird_msg = self.bridge.cv2_to_imgmsg(bird_image, 'bgr8')
-        #     out_bird_msg = self.bridge.cv2_to_imgmsg(bird_image, 'mono8')
-        #     # Publish image message in ROS
-        #     self.pub_image.publish(out_img_msg)
-        #     self.pub_bird.publish(out_bird_msg)
-        #####
+        # grad_image = self.gradient_thresh(raw_img)
+        # colorTH_image = self.color_thresh(raw_img)
+
+        # combine_image = self.combinedBinaryImage(raw_img)
+        # combine_image = (combine_image* 255).astype(np.uint8)
+
+        # if grad_image is not None:
+        #     out_grad_img_msg = self.bridge.cv2_to_imgmsg(grad_image, 'mono8')
+        #     self.pub_grad_thresh.publish(out_grad_img_msg)
+        # if colorTH_image is not None:
+        #     out_colorTH_img_msg = self.bridge.cv2_to_imgmsg(colorTH_image, 'mono8')
+        #     self.pub_color_thresh.publish(out_colorTH_img_msg)
+
+        # if combine_image is not None:
+        #     out_combine_img_msg = self.bridge.cv2_to_imgmsg(combine_image, 'mono8')
+        #     self.pub_combine_thresh.publish(out_combine_img_msg)
+        ######################################################################################
 
 
-
-
-    def gradient_thresh(self, img, thresh_min=25, thresh_max=100):
+    def gradient_thresh(self, img, thresh_min=100, thresh_max=300):
         """
         Apply sobel edge detection on input image in x, y direction
         """
@@ -111,69 +131,81 @@ class lanenet_detector():
         #5. Convert each pixel to unint8, then apply threshold to get binary image
 
         ## TODO
+        # # ===== Sobel Filter =====
+        # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # blur = cv2.GaussianBlur(gray, (5,5),0)
 
+        # sobel_x = cv2.Sobel(blur, cv2.CV_32F, 1, 0, ksize=3)
+        # sobel_y = cv2.Sobel(blur, cv2.CV_32F, 0, 1, ksize=3)
+        # sobel_x = cv2.convertScaleAbs(sobel_x)
+        # sobel_y = cv2.convertScaleAbs(sobel_y)
+
+        # grad = cv2.addWeighted(sobel_x, 0.5, sobel_y, 0.5, 0)
+
+        # ret, binary_output = cv2.threshold(grad, 50, 255, cv2.THRESH_BINARY)
+        
+        # ===== Canny Edge Detection =====
+        # Convert image to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, (5,5),0)
+        gray = self.increase_contrast(gray)
+        # Apply Gaussian blur to reduce noise and improve edge detection
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        
+        # Use Canny edge detector with provided threshold values
+        binary_output = cv2.Canny(blur, thresh_min, thresh_max)
 
-        sobel_x = cv2.Sobel(blur, cv2.CV_32F, 1, 0, ksize=3)
-        sobel_y = cv2.Sobel(blur, cv2.CV_32F, 0, 1, ksize=3)
-        sobel_x = cv2.convertScaleAbs(sobel_x)
-        sobel_y = cv2.convertScaleAbs(sobel_y)
-
-        grad = cv2.addWeighted(sobel_x, 0.5, sobel_y, 0.5, 0)
-
-        ret, binary_output = cv2.threshold(grad, 100, 255, cv2.THRESH_BINARY)
-
+        kernel = np.ones((5, 5), np.uint8)
+        binary_output = cv2.dilate(binary_output, kernel, iterations=1)
         ####
 
         return binary_output
 
 
-    def color_thresh(self, img, thresh=(100, 255)):
-        """
-        Convert RGB to HSL and threshold to binary image using S channel
-        """
-        #1. Convert the image from RGB to HSL
-        #2. Apply threshold on S channel to get binary image
-        #Hint: threshold on H to remove green grass
-        ## TODO
+    def increase_contrast(self, gray_img, clip_limit=2, tile_grid_size=(10,10)):
+        clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+        contrast_img = clahe.apply(gray_img)
+        return contrast_img
+    
+    def color_thresh(self, img):
 
+        ### OLD VERSION ###
         # HLS = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
 
         # # H(Hue):           0-180, 0-R-Y-G-90-B-P-R-180
         # # L(Lightness):     0-255, higher is white, lower is black
         # # S(Saturation):    0-255, higher is bright, lower is gray
 
-        # mask = cv2.inRange(HLS, (0, 0, 0), (70, 255, 255)) # sim
+        # mask = cv2.inRange(HLS, (100, 50, 0), (180, 255, 255)) # Highbay
+        # # mask = cv2.inRange(HLS, (0, 0, 0), (70, 255, 255)) # sim
         # # mask = cv2.inRange(HLS, (0, 200, 0), (180, 255, 150)) # rosbag
 
         # Masked = cv2.bitwise_and(HLS, HLS, mask= mask)
         # GRY = cv2.cvtColor(Masked, cv2.COLOR_BGR2GRAY)
 
-        # ret, binary_output = cv2.threshold(GRY, 100, 255, cv2.THRESH_BINARY)
+        # ret, binary_output = cv2.threshold(GRY, 15, 255, cv2.THRESH_BINARY)
+        # # ret, binary_output = cv2.threshold(GRY, 75, 255, cv2.THRESH_BINARY)
 
-
-
-        #1. Convert RGB image to HLS color space
+        ### CURRENT VERSION ###
         hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
+        L = hls[:,:,1]
+        contrast_L = self.increase_contrast(L)
 
-        h_thresh_y=(15, 35)
+        _, otsu_binary = cv2.threshold(contrast_L, 10, 255, cv2.THRESH_OTSU)
 
-        l_thresh_w=(180, 255)  # in case some white lanes are kinda gray (increase for lighter)
+        hls[:,:,1] = contrast_L
+        # hls[:,:,1] = otsu_binary
 
-        # extract  channels
-        H = hls[:, :, 0]
-        L = hls[:, :, 1]
-        S = hls[:, :, 2]
+        h_thresh_y = (15,35)
+        l_thresh_w = (175, 255)
+
+        H = hls[:,:,0]
+        L = hls[:,:,1]
 
         yellow_mask = cv2.inRange(H, h_thresh_y[0], h_thresh_y[1])
-
         white_mask = cv2.inRange(L, l_thresh_w[0], l_thresh_w[1])
-
-        binary_output = cv2.bitwise_or(yellow_mask, white_mask)
-
         ####
 
+        binary_output = cv2.bitwise_or(yellow_mask, white_mask)
         return binary_output
 
 
@@ -201,10 +233,13 @@ class lanenet_detector():
         ####
 
         binaryImage = np.zeros_like(SobelOutput)
-        binaryImage[(ColorOutput==1)|(SobelOutput==1)] = 1
-        # Remove noise from binary image
-        binaryImage = morphology.remove_small_objects(binaryImage.astype('bool'),min_size=50,connectivity=2)
+        binaryImage[(ColorOutput==1) & (SobelOutput==1)] = 1
+        # binaryImage[(SobelOutput==1)] = 1
 
+
+        # Remove noise from binary image
+        binaryImage = morphology.remove_small_objects(binaryImage.astype('bool'),min_size=200,connectivity=2)
+        
         return binaryImage
 
 
@@ -278,16 +313,16 @@ class lanenet_detector():
                     left_lane_inds = ret['left_lane_inds']
                     right_lane_inds = ret['right_lane_inds']
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+                    # left_fit = self.left_line.add_fit(left_fit)
+                    # right_fit = self.right_line.add_fit(right_fit)
 
                     self.detected = True
 
             else:
-                left_fit = self.left_line.get_fit()
-                right_fit = self.right_line.get_fit()
-                ret = tune_fit(img_birdeye, left_fit, right_fit)
-
+                # left_fit = self.left_line.get_fit()
+                # right_fit = self.right_line.get_fit()
+                # ret = tune_fit(img_birdeye, left_fit, right_fit)
+                ret = line_fit(img_birdeye)
                 if ret is not None:
                     left_fit = ret['left_fit']
                     right_fit = ret['right_fit']
@@ -296,8 +331,8 @@ class lanenet_detector():
                     left_lane_inds = ret['left_lane_inds']
                     right_lane_inds = ret['right_lane_inds']
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+                    # left_fit = self.left_line.add_fit(left_fit)
+                    # right_fit = self.right_line.add_fit(right_fit)
 
                 else:
                     self.detected = False
@@ -305,9 +340,11 @@ class lanenet_detector():
             # Annotate original image
             bird_fit_img = None
             combine_fit_img = None
+            waypoints = []
             if ret is not None:
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
                 combine_fit_img, waypoints = final_viz(img, left_fit, right_fit, Minv)
+                # viz1(img, ret)
             else:
                 print("Unable to detect lanes")
 

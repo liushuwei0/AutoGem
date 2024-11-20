@@ -34,13 +34,13 @@ class lanenet_detector():
         ### ===== Uncomment this block to see the result of the three filtered image ===== ###
         # self.pub_color_thresh = rospy.Publisher("lane_detection/color_thresh", Image, queue_size=1)
         # self.pub_grad_thresh = rospy.Publisher("lane_detection/grad_thresh", Image, queue_size=1)
-        # self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
+        self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
         ######################################################################################
 
         self.pub_waypoints = rospy.Publisher('lane_detection/waypoints', Float32MultiArray, queue_size=1)
         self.waypoints_msg = Float32MultiArray()
         self.waypoints_msg.data = []
-    
+
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
         self.detected = False
@@ -52,10 +52,20 @@ class lanenet_detector():
         try:
             # Convert a ROS image message into an OpenCV image
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+
+            # plt.imshow(cv_image)
+            # plt.show()
+
         except CvBridgeError as e:
             print(e)
 
         raw_img = cv_image.copy()
+
+        # ===== Uncomment for saving test view to get transformation matrix =====
+        # cv2.imwrite('test.png', raw_img)
+        # print("Finish! Please Ctrl+C to terminate the program.")
+        # input()
+        # =======================================================================
 
         rows, cols, _ = raw_img.shape
         x_clip = int(cols//5)
@@ -87,7 +97,7 @@ class lanenet_detector():
             flat_coordinates = [item for sublist in waypoints for item in sublist]
             self.waypoints_msg.data = flat_coordinates
             self.pub_waypoints.publish(self.waypoints_msg)
-            print("Published coordinates: ", self.waypoints_msg.data)
+            # print("Published coordinates: ", self.waypoints_msg.data)
         #####
 
 
@@ -115,12 +125,13 @@ class lanenet_detector():
     def gradient_thresh(self, img, thresh_min=120, thresh_max=300):
         """
         Apply sobel edge detection on input image in x, y direction
+        """
         #1. Convert the image to gray scale
         #2. Gaussian blur the image
         #3. Use cv2.Sobel() to find derievatives for both X and Y Axis
         #4. Use cv2.addWeighted() to combine the results
         #5. Convert each pixel to unint8, then apply threshold to get binary image
-        """
+
         ## TODO
         # # ===== Sobel Filter =====
         # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -298,14 +309,14 @@ class lanenet_detector():
                     left_lane_inds = ret['left_lane_inds']
                     right_lane_inds = ret['right_lane_inds']
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+                    # left_fit = self.left_line.add_fit(left_fit)
+                    # right_fit = self.right_line.add_fit(right_fit)
 
                     self.detected = True
 
             else:
-                left_fit = self.left_line.get_fit()
-                right_fit = self.right_line.get_fit()
+                # left_fit = self.left_line.get_fit()
+                # right_fit = self.right_line.get_fit()
                 # ret = tune_fit(img_birdeye, left_fit, right_fit)
                 ret = line_fit(img_birdeye)
                 if ret is not None:
@@ -316,8 +327,8 @@ class lanenet_detector():
                     left_lane_inds = ret['left_lane_inds']
                     right_lane_inds = ret['right_lane_inds']
 
-                    left_fit = self.left_line.add_fit(left_fit)
-                    right_fit = self.right_line.add_fit(right_fit)
+                    # left_fit = self.left_line.add_fit(left_fit)
+                    # right_fit = self.right_line.add_fit(right_fit)
 
                 else:
                     self.detected = False

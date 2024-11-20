@@ -19,17 +19,82 @@ from geometry_msgs.msg import Twist
 from pacmod_msgs.msg import PositionWithSpeed, PacmodCmd, SystemRptFloat, VehicleSpeedRpt
 # from gazebo_msgs.srv import GetModelState, GetModelStateResponse
 
+class PID(object):
 
+    def __init__(self, kp, ki, kd, wg=None):
+
+        self.iterm  = 0
+        self.last_t = None
+        self.last_e = 0
+        self.kp     = kp
+        self.ki     = ki
+        self.kd     = kd
+        self.wg     = wg
+        self.derror = 0
+
+    def reset(self):
+        self.iterm  = 0
+        self.last_e = 0
+        self.last_t = None
+
+    def get_control(self, t, e, fwd=0):
+
+        if self.last_t is None:
+            self.last_t = t
+            de = 0
+        else:
+            de = (e - self.last_e) / (t - self.last_t)
+
+        if abs(e - self.last_e) > 0.5:
+            de = 0
+
+        self.iterm += e * (t - self.last_t)
+
+        # take care of integral winding-up
+        if self.wg is not None:
+            if self.iterm > self.wg:
+                self.iterm = self.wg
+            elif self.iterm < -self.wg:
+                self.iterm = -self.wg
+
+        self.last_e = e
+        self.last_t = t
+        self.derror = de
+
+        return fwd + self.kp * e + self.ki * self.iterm + self.kd * de
+    
+class OnlineFilter(object):
+
+    def __init__(self, cutoff, fs, order):
+        
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+
+        # Get the filter coefficients 
+        self.b, self.a = signal.butter(order, normal_cutoff, btype='low', analog=False)
+
+        # Initialize
+        self.z = signal.lfilter_zi(self.b, self.a)
+    
+    def get_data(self, data):
+        filted, self.z = signal.lfilter(self.b, self.a, [data], zi=self.z)
+        return filted
+    
 class vehicleController():
 
     def __init__(self):
-        self.rate = rospy.Rate(25) # 25 Hz
+        self.rate = rospy.Rate(10) # 10 Hz
 
-        self.L = 1.75  # Wheelbase, can be get from gem_control.py
+        # self.L = 1.75  # Wheelbase of GEMe2
+        self.L = 2.56  # Wheelbase of GEMe4
 
         # PID for longitudinal control
         self.desired_speed = 0.6  # m/s
         self.max_accel = 0.48  # % of acceleration
+        self.pid_speed     = PID(0.5, 0.0, 0.1, wg=20)
+        self.speed_filter  = OnlineFilter(1.2, 30, 4)
+
+        self.prev_accel = 0.0
 
         self.speed_sub  = rospy.Subscriber("/pacmod/parsed_tx/vehicle_speed_rpt", VehicleSpeedRpt, self.speed_callback)
         self.speed      = 0.0
@@ -85,6 +150,9 @@ class vehicleController():
     # PACMod enable callback function
     def pacmod_enable_callback(self, msg):
         self.pacmod_enable = msg.data
+
+    def speed_callback(self, msg):
+        self.speed = round(msg.vehicle_speed, 3) # forward velocity in m/s
 
     # Get value of steering wheel
     def steer_callback(self, msg):
@@ -259,14 +327,22 @@ class vehicleController():
 
                     # target_steering = np.radians(target_steering)
 
-                    acc = target_velocity - self.speed
+                    current_time = rospy.get_time()
+                    filt_vel     = self.speed_filter.get_data(self.speed)
+                    # acc = target_velocity - filt_vel
+                    acc = self.pid_speed.get_control(current_time, self.desired_speed - filt_vel)
 
-                    if acc > 0.64 :
+
+                    if acc > self.max_accel :
                         throttle_percent = self.max_accel
-                    elif acc < 0.0 :
-                        throttle_percent = 0.0
-                    else:
-                        throttle_percent = acc / 0.64 * self.max_accel  
+                    elif acc < 0.3 :
+                        if self.prev_accel > 0.25:
+                            throttle_percent = self.prev_accel - 0.001
+                    self.prev_accel = throttle_percent
+
+                    print("- current_speed", round(filt_vel, 3))
+                    print("- current_accel", round(acc, 3))
+                    print("- throttle_percent", round(throttle_percent, 3))
 
                     if (target_steering <= 45 and target_steering >= -45):
                         self.turn_cmd.ui16_cmd = 1
