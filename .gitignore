@@ -52,3 +52,9 @@ CATKIN_IGNORE
 
 /.vscode
 .catkin_workspace
+
+
+
+# Ignore.pt files for YOLOv8
+*.pt
+

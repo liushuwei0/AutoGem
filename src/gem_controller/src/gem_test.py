@@ -15,10 +15,6 @@ from std_msgs.msg import String, Bool, Float32, Float64, Float32MultiArray
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from geometry_msgs.msg import Twist
 
-# GEM PACMod Headers
-from pacmod_msgs.msg import PositionWithSpeed, PacmodCmd, SystemRptFloat, VehicleSpeedRpt
-# from gazebo_msgs.srv import GetModelState, GetModelStateResponse
-
 class PID(object):
 
     def __init__(self, kp, ki, kd, wg=None):
@@ -95,71 +91,12 @@ class vehicleController():
         self.speed_filter  = OnlineFilter(1.2, 30, 4)
 
         self.prev_accel = 0.0
-
-        self.speed_sub  = rospy.Subscriber("/pacmod/parsed_tx/vehicle_speed_rpt", VehicleSpeedRpt, self.speed_callback)
         self.speed      = 0.0
-
-        self.steer_sub = rospy.Subscriber("/pacmod/parsed_tx/steer_rpt", SystemRptFloat, self.steer_callback)
         self.steer = 0.0 # degrees
-
-        rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.waypoints_callback)
         self.waypoints = [[2.0,0.0],[2.0,7.5],[2.0,15.0],[2.0,17.0]]
 
-
-        # -------------------- PACMod setup --------------------
-
-        self.gem_enable    = False
-        self.pacmod_enable = False
-
-        # GEM vehicle enable
-        self.enable_sub = rospy.Subscriber('/pacmod/as_rx/enable', Bool, self.pacmod_enable_callback)
-        # self.enable_cmd = Bool()
-        # self.enable_cmd.data = False
-
-        # GEM vehicle gear control, neutral, forward and reverse, publish once
-        self.gear_pub = rospy.Publisher('/pacmod/as_rx/shift_cmd', PacmodCmd, queue_size=1)
-        self.gear_cmd = PacmodCmd()
-        self.gear_cmd.ui16_cmd = 2 # SHIFT_NEUTRAL
-
-        # GEM vehilce brake control
-        self.brake_pub = rospy.Publisher('/pacmod/as_rx/brake_cmd', PacmodCmd, queue_size=1)
-        self.brake_cmd = PacmodCmd()
-        self.brake_cmd.enable = False
-        self.brake_cmd.clear  = True
-        self.brake_cmd.ignore = True
-
-        # GEM vechile forward motion control
-        self.accel_pub = rospy.Publisher('/pacmod/as_rx/accel_cmd', PacmodCmd, queue_size=1)
-        self.accel_cmd = PacmodCmd()
-        self.accel_cmd.enable = False
-        self.accel_cmd.clear  = True
-        self.accel_cmd.ignore = True
-
-        # GEM vechile turn signal control
-        self.turn_pub = rospy.Publisher('/pacmod/as_rx/turn_cmd', PacmodCmd, queue_size=1)
-        self.turn_cmd = PacmodCmd()
-        self.turn_cmd.ui16_cmd = 1 # None
-
-        # GEM vechile steering wheel control
-        self.steer_pub = rospy.Publisher('/pacmod/as_rx/steer_cmd', PositionWithSpeed, queue_size=1)
-        self.steer_cmd = PositionWithSpeed()
-        self.steer_cmd.angular_position = 0.0 # radians, -: clockwise, +: counter-clockwise
-        self.steer_cmd.angular_velocity_limit = 2.0 # radians/second
-
-
-    # PACMod enable callback function
-    def pacmod_enable_callback(self, msg):
-        self.pacmod_enable = msg.data
-
-    def speed_callback(self, msg):
-        self.speed = round(msg.vehicle_speed, 3) # forward velocity in m/s
-
-    # Get value of steering wheel
-    def steer_callback(self, msg):
-        self.steer = round(np.degrees(msg.output),1)
-
-    def waypoints_callback(self, msg):
-        self.waypoints = [(msg.data[i], msg.data[i+1]) for i in range(0, len(msg.data), 2)]
+        self.pacmod_enable = True
+        self.gem_enable = True
 
     def longititudal_controller(self):
         curr_x, curr_y = self.waypoints[3]
@@ -278,35 +215,6 @@ class vehicleController():
             if(self.pacmod_enable == True):
                 if (self.gem_enable == False):
 
-                    # ---------- Enable PACMod ----------
-
-                    # enable forward gear
-                    self.gear_cmd.ui16_cmd = 3
-
-                    # enable brake
-                    self.brake_cmd.enable  = True
-                    self.brake_cmd.clear   = False
-                    self.brake_cmd.ignore  = False
-                    self.brake_cmd.f64_cmd = 0.0
-
-                    # enable gas 
-                    self.accel_cmd.enable  = True
-                    self.accel_cmd.clear   = False
-                    self.accel_cmd.ignore  = False
-                    self.accel_cmd.f64_cmd = 0.0
-
-                    self.gear_pub.publish(self.gear_cmd)
-                    print("Foward Engaged!")
-
-                    self.turn_pub.publish(self.turn_cmd)
-                    print("Turn Signal Ready!")
-                    
-                    self.brake_pub.publish(self.brake_cmd)
-                    print("Brake Engaged!")
-
-                    self.accel_pub.publish(self.accel_cmd)
-                    print("Gas Engaged!")
-
                     self.gem_enable = True
 
                 else: 
@@ -365,21 +273,6 @@ class vehicleController():
                     print("- current_speed   ", round(float(filt_vel), 3))
                     print("- current_accel   ", round(float(acc), 3))
                     print("- throttle_percent", round(float(throttle_percent), 3))
-
-                    if (target_steering <= 45 and target_steering >= -45):
-                        self.turn_cmd.ui16_cmd = 1
-                    elif(target_steering > 45):
-                        self.turn_cmd.ui16_cmd = 2 # turn left
-                    else:
-                        self.turn_cmd.ui16_cmd = 0 # turn right
-
-                    self.accel_cmd.f64_cmd = throttle_percent
-                    self.steer_cmd.angular_position = np.radians(target_steering)
-  
-                    self.accel_pub.publish(self.accel_cmd)
-                    self.steer_pub.publish(self.steer_cmd)
-                    
-
 
 
 def pure_pursuit():
