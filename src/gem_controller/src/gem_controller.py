@@ -7,6 +7,7 @@ import math
 import numpy as np
 from numpy import linalg as la
 import scipy.signal as signal
+import time
 
 # ROS Headers
 import rospy
@@ -89,12 +90,14 @@ class vehicleController():
         # self.L = 2.56  # Wheelbase of GEMe4
 
         # PID for longitudinal control
-        self.desired_speed = 0.6  # m/s
+        self.desired_speed = 0.3  # m/s
         self.max_accel = 0.48  # % of acceleration
         self.pid_speed     = PID(0.5, 0.0, 0.1, wg=20)
         self.speed_filter  = OnlineFilter(1.2, 30, 4)
 
         self.prev_accel = 0.0
+        self.prev_steer = 0.0
+        self.init_steer = True
 
         self.speed_sub  = rospy.Subscriber("/pacmod/parsed_tx/vehicle_speed_rpt", VehicleSpeedRpt, self.speed_callback)
         self.speed      = 0.0
@@ -103,8 +106,13 @@ class vehicleController():
         self.steer = 0.0 # degrees
 
         rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.waypoints_callback)
-        self.waypoints = [[2.0,0.0],[2.0,7.5],[2.0,15.0],[2.0,17.0]]
+        self.waypoints = [[2.0,0.0],[2.0,4.0],[2.0,7.0],[2.0,10.0],[2.0,17.0]]
 
+        rospy.Subscriber('yolo_detection/obstacle', Bool, self.yolo_callback)
+        self.obstacle = False
+
+        self.pacmod_enable = True
+        self.gem_enable = True
 
         # -------------------- PACMod setup --------------------
 
@@ -159,10 +167,14 @@ class vehicleController():
         self.steer = round(np.degrees(msg.output),1)
 
     def waypoints_callback(self, msg):
-        self.waypoints = [(msg.data[i], msg.data[i+1]) for i in range(0, len(msg.data), 2)]
+        if len(msg.data) > 0:
+            self.waypoints = [(msg.data[i], msg.data[i+1]) for i in range(0, len(msg.data), 2)]
+
+    def yolo_callback(self, msg):
+        self.obstacle = msg.data
 
     def longititudal_controller(self):
-        curr_x, curr_y = self.waypoints[3]
+        curr_x, curr_y = self.waypoints[-1]
 
         wp1_x,   wp1_y = self.waypoints[1]
         wp2_x,   wp2_y = self.waypoints[0]
@@ -196,15 +208,48 @@ class vehicleController():
         curr_x, curr_y = self.waypoints[-1]
         wp0_x,   wp0_y = self.waypoints[-2]
         wp1_x,   wp1_y = self.waypoints[-3]
-        wp2_x,   wp2_y = self.waypoints[0]
+        wp2_x,   wp2_y = self.waypoints[-4]
+        wp3_x,   wp3_y = self.waypoints[-5]
 
+        # print("0", curr_x, curr_y)
+        # print("1", wp0_x, wp0_y)
+        # print("2", wp1_x, wp1_y)
+        # print("3", wp2_x, wp2_y)
+        # print("4", wp3_x, wp3_y)
 
         # Look at nearest point for steep curve
-        vec2_x, vec2_y = wp0_x - curr_x, -(wp0_y - curr_y)
-        angle_curr_to_wp0  = np.arctan2(vec2_y, vec2_x)
+        vec2_x, vec2_y = wp2_x - curr_x, -(wp2_y - curr_y)
 
-        ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
-        alpha1 = angle_curr_to_wp0 - np.pi/2
+        if abs(vec2_x / vec2_y) > 0.1:
+            ld1 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
+            angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+        else:
+            vec2_x, vec2_y = wp1_x - curr_x, -(wp1_y - curr_y)
+
+            vec2_x = vec2_x * 0.1
+
+            angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+            ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
+        alpha1 = angle_curr_to_wp - np.pi/2
+
+
+
+
+
+        # # Look at nearest point for steep curve
+        # vec2_x, vec2_y = wp0_x - curr_x, -(wp0_y - curr_y)
+        # angle_curr_to_wp0  = np.arctan2(vec2_y, vec2_x)
+
+        # ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
+        # alpha1 = angle_curr_to_wp0 - np.pi/2
+
+
+        # # Look at nearest point for steep curve
+        # vec2_x, vec2_y = wp1_x - curr_x, -(wp1_y - curr_y)
+        # angle_curr_to_wp1  = np.arctan2(vec2_y, vec2_x)
+
+        # ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
+        # alpha1 = angle_curr_to_wp1 - np.pi/2
 
 
         # # Look at x- nearest point
@@ -274,7 +319,7 @@ class vehicleController():
     def execute(self):
         while not rospy.is_shutdown():
             self.rate.sleep()  # Wait a while before trying to get a new state
-
+            self.pacmod_enable = True
             if(self.pacmod_enable == True):
                 if (self.gem_enable == False):
 
@@ -311,76 +356,138 @@ class vehicleController():
 
                 else: 
 
-                    target_velocity = self.longititudal_controller()
-                    target_steering = self.pure_pursuit_lateral_controller()
-                    # target_velocity = 1
-                    # target_steering = 1.1
+                    if self.obstacle == True:
 
+                        print("Obstacle Detected! Stopping the vehicle")
+                        ######
+                        throttle_percent = 0.0
+                        self.prev_accel = 0.0
+                        self.accel_cmd.f64_cmd = throttle_percent
+                        self.accel_pub.publish(self.accel_cmd)
+                        ###### 
+                        # Coundown
+                        for i in range(10, 0, -1):
+                            print(i)
+                            time.sleep(1)
+                        self.obstacle = False
+                        print("Restarting the controller")
 
-                    # # Heading angle [rad] to Steering wheel[deg](-630 to 630 deg)
-                    target_steering = np.degrees(target_steering)
-                    target_steering = self.front2steer(target_steering)
-
-                    print("-----")
-                    print("target_velocity[m/s]", round(target_velocity, 2))
-                    print("target_steering[deg]", round(target_steering, 2))
-
-                    # target_steering = np.radians(target_steering)
-
-                    current_time = rospy.get_time()
-                    filt_vel     = self.speed_filter.get_data(self.speed)
-                    # acc = target_velocity - filt_vel
-                    acc = self.pid_speed.get_control(current_time, self.desired_speed - filt_vel)
-
-
-                    # # GEMe4
-                    # if acc < 0.3:
-                    #     acc = acc + 0.1
-
-                    # if acc > self.max_accel :
-                    #     throttle_percent = self.max_accel
-                    # elif acc < 0.4 :
-                    #     throttle_percent = acc
-                    #     if self.prev_accel > 0.4:
-                    #         throttle_percent = self.prev_accel - 0.001
-                    # else:
-                    #     throttle_percent = acc
-                    # self.prev_accel = throttle_percent
-
-                    thresh_acc       = 0.29
-                    min_acc          = 0.20
-                    throttle_percent = 0.10
-
-                    if acc > self.max_accel:
-                        throttle_percent = min(self.prev_accel + 0.005, self.max_accel)
-                    elif acc >= thresh_acc:
-                        if acc > self.prev_accel:
-                            throttle_percent = self.prev_accel + 0.005
-                        else:
-                            throttle_percent = self.prev_accel - 0.005
-                    else:  # acc < thresh_acc
-                        throttle_percent = max(self.prev_accel - 0.005, min_acc)
-                    self.prev_accel = throttle_percent
-
-                    print("- current_speed   ", round(float(filt_vel), 3))
-                    print("- current_accel   ", round(float(acc), 3))
-                    print("- throttle_percent", round(float(throttle_percent), 3))
-
-                    if (target_steering <= 45 and target_steering >= -45):
-                        self.turn_cmd.ui16_cmd = 1
-                    elif(target_steering > 45):
-                        self.turn_cmd.ui16_cmd = 2 # turn left
                     else:
-                        self.turn_cmd.ui16_cmd = 0 # turn right
 
-                    self.accel_cmd.f64_cmd = throttle_percent
-                    self.steer_cmd.angular_position = np.radians(target_steering)
-  
-                    self.accel_pub.publish(self.accel_cmd)
-                    self.steer_pub.publish(self.steer_cmd)
+                        target_velocity = self.longititudal_controller()
+                        target_steering = self.pure_pursuit_lateral_controller()
+
+
+                        ##### Steering Conversion #####
+                        # # Heading angle [rad] to Steering wheel[deg](-630 to 630 deg)
+                        target_steering = np.degrees(target_steering)
+
+                        # print("+ wheel angle[deg]", target_steering)
+
+                        target_steering = self.front2steer(target_steering)
+
+                        ########## Increase the steering angle temporarily ###########
+                        target_steering = target_steering * 1.6
+
+                        # 300 deg => 600 deg
+                        # 200 deg => 400 deg
+                        # 100 deg => 150 deg
+                        #  50 deg =>  63 deg
+                        #  10 deg =>  11 deg
+                        # diff = min(target_steering, target_steering ** 2 / 200)
+                        # target_steering = target_steering + diff
+
+                        # 200 deg => 332 deg
+                        # 100 deg => 235 deg
+                        #  50 deg => 139 deg
+                        #  10 deg =>  30 deg
+                        # target_steering = np.arctan(target_steering / 100) * 300
+                        #############################################################
+
+                        # When the steering angle is too large, the steering angle is limited to the maximum value.
+                        if abs(target_steering - self.prev_steer) > 200\
+                            and target_steering*self.prev_steer < 0:
+                            target_steering = self.prev_steer
+
+                        # Set the initial steering angle to 0
+                        if self.init_steer:
+                            target_steering = 0.0
+                            self.init_steer = False
+                        # When the steering angle is large, the steering angle is limited to the maximum value.
+                        else:
+                            if target_steering - self.prev_steer > 90:
+                                target_steering = self.prev_steer + 90
+                            elif target_steering - self.prev_steer < -90:
+                                target_steering = self.prev_steer - 90
+                            else:
+                                target_steering = target_steering
+
+                        self.prev_steer = target_steering
+                        ###############################
+
+
+                        ##### Velocity Conversion #####
+                        current_time = rospy.get_time()
+                        filt_vel     = self.speed_filter.get_data(self.speed)
+                        # acc = target_velocity - filt_vel
+                        acc = self.pid_speed.get_control(current_time, self.desired_speed - filt_vel)
+
+
+                        # # GEMe4
+                        # if acc < 0.3:
+                        #     acc = acc + 0.1
+
+                        # if acc > self.max_accel :
+                        #     throttle_percent = self.max_accel
+                        # elif acc < 0.4 :
+                        #     throttle_percent = acc
+                        #     if self.prev_accel > 0.4:
+                        #         throttle_percent = self.prev_accel - 0.001
+                        # else:
+                        #     throttle_percent = acc
+                        # self.prev_accel = throttle_percent
+
+                        thresh_acc       = 0.33
+                        min_acc          = 0.33
+                        throttle_percent = 0.10
+
+                        acc = acc + 0.1
+
+                        if acc > self.max_accel:
+                            throttle_percent = min(self.prev_accel + 0.005, self.max_accel)
+                        elif acc >= thresh_acc:
+                            if acc > self.prev_accel:
+                                throttle_percent = self.prev_accel + 0.005
+                            else:
+                                throttle_percent = self.prev_accel - 0.005
+                        elif acc < 0:
+                            throttle_percent = max(self.prev_accel - 0.005, 0.31)
+                        else:  # 0 < acc < thresh_acc
+                            throttle_percent = max(self.prev_accel - 0.005, min_acc)
+                        self.prev_accel = throttle_percent
+                        ###############################
+
+                        print("-----")
+                        print("target_velocity[m/s]", round(target_velocity, 2))
+                        print("target_steering[deg]", round(target_steering, 2))
+
+                        print("- current_speed   ", round(float(filt_vel), 3))
+                        print("- current_accel   ", round(float(acc), 3))
+                        print("- throttle_percent", round(float(throttle_percent), 3))
+
+                        if (target_steering <= 45 and target_steering >= -45):
+                            self.turn_cmd.ui16_cmd = 1
+                        elif(target_steering > 45):
+                            self.turn_cmd.ui16_cmd = 2 # turn left
+                        else:
+                            self.turn_cmd.ui16_cmd = 0 # turn right
+
+                        self.accel_cmd.f64_cmd = throttle_percent
+                        self.steer_cmd.angular_position = np.radians(target_steering)
+    
+                        self.accel_pub.publish(self.accel_cmd)
+                        self.steer_pub.publish(self.steer_cmd)
                     
-
-
 
 def pure_pursuit():
 
