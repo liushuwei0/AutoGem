@@ -120,7 +120,8 @@ class vehicleController():
 
         self.pacmod_enable = True
         self.gem_enable = True
-
+        #----------------------T turn modify------------------------------
+        self.t_turn = [0,0,0,0,0]
         # -------------------- PACMod setup --------------------
 
         self.gem_enable    = False
@@ -464,9 +465,23 @@ class vehicleController():
                             else:
                                 target_steering = target_steering
 
+                        pub_steering = target_steering
                         self.prev_steer = target_steering
                         ###############################
 
+                        ######################  T turn problem   ##############################################
+                        self.t_turn[:-1] = self.t_turn[1:] 
+                        self.t_turn[-1] = target_steering
+                        count = 0
+                        for i in range(5):
+                            if self.t_turn[i] < -200:
+                                count = count+1
+                            else:
+                                count = count
+                        print(f"count={count}")
+                        if count == 5:
+                            pub_steering = 0
+                        ###############################
 
                         ##### Velocity Conversion #####
                         current_time = rospy.get_time()
@@ -509,7 +524,7 @@ class vehicleController():
                             self.turn_cmd.ui16_cmd = 0 # turn right
 
                         self.accel_cmd.f64_cmd = throttle_percent
-                        self.steer_cmd.angular_position = np.radians(target_steering)
+                        self.steer_cmd.angular_position = np.radians(pub_steering)
     
                         self.accel_pub.publish(self.accel_cmd)
                         self.steer_pub.publish(self.steer_cmd)
