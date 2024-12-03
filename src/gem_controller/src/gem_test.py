@@ -80,13 +80,14 @@ class OnlineFilter(object):
 class vehicleController():
 
     def __init__(self):
-        self.rate = rospy.Rate(10) # 10 Hz
+        self.hz = 10
+        self.rate = rospy.Rate(self.hz)
 
         self.L = 1.75  # Wheelbase of GEMe2
         # self.L = 2.56  # Wheelbase of GEMe4
 
         # PID for longitudinal control
-        self.desired_speed = 0.6  # m/s
+        self.desired_speed = 0.3  # m/s
         self.max_accel = 0.48  # % of acceleration
         self.pid_speed     = PID(0.5, 0.0, 0.1, wg=20)
         self.speed_filter  = OnlineFilter(1.2, 30, 4)
@@ -101,8 +102,14 @@ class vehicleController():
         rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.waypoints_callback)
         self.waypoints = [[2.0,0.0],[2.0,4.0],[2.0,7.0],[2.0,10.0],[2.0,17.0]]
 
-        rospy.Subscriber('yolo_detection/obstacle', Bool, self.yolo_callback)
-        self.obstacle = False
+        rospy.Subscriber('Ultralytics/human_detection/detection', Bool, self.yolo_human_callback)
+        self.detect_human = False
+
+        rospy.Subscriber('Ultralytics/stop_sign_detection/detection', Bool, self.yolo_stopsign_callback)
+        self.detect_stopsign         = False
+        self.ignore_stopsign_timer   = 0
+        self.ignore_stopsign_init    = True
+        self.ignore_stopsign_waitsec = 5 # Ignore stop sign for waitsec
 
         self.pacmod_enable = True
         self.gem_enable = True
@@ -111,8 +118,11 @@ class vehicleController():
         if len(msg.data) > 0:
             self.waypoints = [(msg.data[i], msg.data[i+1]) for i in range(0, len(msg.data), 2)]
 
-    def yolo_callback(self, msg):
-        self.obstacle = msg.data
+    def yolo_human_callback(self, msg):
+        self.detect_human = msg.data
+
+    def yolo_stopsign_callback(self, msg):
+        self.detect_stopsign = msg.data
 
     def longititudal_controller(self):
         curr_x, curr_y = self.waypoints[-1]
@@ -268,21 +278,55 @@ class vehicleController():
 
                 else: 
 
-                    if self.obstacle == True:
-
-                        print("Obstacle Detected! Stopping the vehicle")
-                        ######
-                        throttle_percent = 0.0
-                        # publish the throttle
-                        ###### 
-                        # Coundown
-                        for i in range(10, 0, -1):
-                            print(i)
-                            time.sleep(1)
-                        self.obstacle = False
+                    ##### Emergency Stop for Human Detection #####
+                    if self.detect_human == True:
+                        print("Human Detected! Stopping the vehicle")
+                        # Stop while detecting human
+                        while self.detect_human == True:
+                            self.detect_human = False
+                            ######
+                            throttle_percent = 0.0
+                            self.prev_accel = 0.0
+                            # self.accel_cmd.f64_cmd = throttle_percent
+                            # self.accel_pub.publish(self.accel_cmd)
+                            ######
+                            time.sleep(2)
+                            print("Waiting for the human to move away")
+                            # Break when detect_human is still False
+                        
                         print("Restarting the controller")
+                    ##############################################
 
                     else:
+
+                        ##### Emergency Stop for Stop Sign Detection #####
+                        if self.detect_stopsign == True:
+                            # Initially stop for 5 sec
+                            if self.ignore_stopsign_init == True:
+                                print("Stop Sign Detected! Stopping the vehicle")
+                                # Coundown
+                                for i in range(5, 0, -1):
+                                    ######
+                                    throttle_percent = 0.0
+                                    self.prev_accel = 0.0
+                                    # self.accel_cmd.f64_cmd = throttle_percent
+                                    # self.accel_pub.publish(self.accel_cmd)
+                                    ######
+                                    print(i)
+                                    time.sleep(1)
+                                self.ignore_stopsign_timer = self.ignore_stopsign_waitsec
+                                self.ignore_stopsign_init = False
+                                print("Restarting the controller")
+                            # Ignore stop sign for waitsec
+                            elif self.ignore_stopsign_timer > 0.01:
+                                # Ignore stop sign for waitsec
+                                self.ignore_stopsign_timer -= 1/ self.hz
+                                print("### Ignoring Stop Sign for", round(self.ignore_stopsign_timer, 1), "sec ###")
+                            # Init the timer and restart
+                            else:
+                                self.detect_stopsign = False
+                                self.ignore_stopsign_init = True
+                        ##################################################
 
                         target_velocity = self.longititudal_controller()
                         target_steering = self.pure_pursuit_lateral_controller()
