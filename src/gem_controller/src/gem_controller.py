@@ -118,8 +118,6 @@ class vehicleController():
         self.ignore_stopsign_init    = True
         self.ignore_stopsign_waitsec = 5 # Ignore stop sign for waitsec
 
-        self.pacmod_enable = True
-        self.gem_enable = True
         #----------------------T turn modify------------------------------
         self.t_turn = [0,0,0,0,0]
         # -------------------- PACMod setup --------------------

@@ -70,9 +70,9 @@ class lanenet_detector():
         y_clip = int(rows//2)
         # y_clip = 3*int(rows//5)
 
-        raw_img[:y_clip, :] = [60, 60, 60]
-        raw_img[:, :x_clip] = [60, 60, 60]
-        raw_img[:, 4*x_clip:] = [60, 60, 60]
+        # raw_img[:y_clip, :] = [60, 60, 60]
+        # raw_img[:, :x_clip] = [60, 60, 60]
+        # raw_img[:, 4*x_clip:] = [60, 60, 60]
 
         # cv2.imwrite("test.png", raw_img)
         # time.sleep(10000000)

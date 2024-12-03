@@ -138,9 +138,9 @@ def line_fit(binary_warped):
 			### Detect direction: Upwards
 			y_top = binary_warped.shape[0] - window * window_height
 			y_bottom = binary_warped.shape[0] - (window + 1) * window_height
-			if window == 0:
-				continue
-				# y_top = y_top - window_height//10
+			# if window == 0:
+			# 	continue
+			# 	# y_top = y_top - window_height//10
 
 			leftX_L = leftx_current - margin			# ----- Left Half
 			leftX_R = leftx_current + margin
@@ -175,9 +175,9 @@ def line_fit(binary_warped):
 			y_top = binary_warped.shape[0] - window * window_height
 			y_bottom = binary_warped.shape[0] - (window + 1) * window_height
 
-			if window == 0:
-				continue
-				# y_top = y_top - window_height//10
+			# if window == 0:
+			# 	continue
+			# 	# y_top = y_top - window_height//10
 
 			leftX_L = leftx_current - margin*5			# ----- Only Left Lane needed
 			leftX_R = leftx_current + margin*5
@@ -206,9 +206,9 @@ def line_fit(binary_warped):
 			y_top = binary_warped.shape[0] - window * window_height
 			y_bottom = binary_warped.shape[0] - (window + 1) * window_height
 
-			if window == 0:
-				continue
-				# y_top = y_top - window_height//10
+			# if window == 0:
+			# 	continue
+			# 	# y_top = y_top - window_height//10
 
 			rightX_L = rightx_current - margin*5			# ----- Only Right Lane
 			rightX_R = rightx_current + margin*5

@@ -97,7 +97,7 @@ class vehicleController():
         self.init_steer = True
 
         self.speed      = 0.0
-        self.steer = 0.0 # degrees
+        self.steer      = 0.0 # degrees
 
         rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.waypoints_callback)
         self.waypoints = [[2.0,0.0],[2.0,4.0],[2.0,7.0],[2.0,10.0],[2.0,17.0]]
@@ -113,6 +113,8 @@ class vehicleController():
 
         self.pacmod_enable = True
         self.gem_enable = True
+        #----------------------T turn modify------------------------------
+        self.t_turn = [0,0,0,0,0]
 
     def waypoints_callback(self, msg):
         if len(msg.data) > 0:
@@ -270,7 +272,8 @@ class vehicleController():
     def execute(self):
         while not rospy.is_shutdown():
             self.rate.sleep()  # Wait a while before trying to get a new state
-
+            self.pacmod_enable = True
+            self.gem_enable = True
             if(self.pacmod_enable == True):
                 if (self.gem_enable == False):
 
@@ -376,9 +379,23 @@ class vehicleController():
                             else:
                                 target_steering = target_steering
 
+                        pub_steering = target_steering
                         self.prev_steer = target_steering
                         ###############################
 
+                        ######################  T turn problem   ##############################################
+                        self.t_turn[:-1] = self.t_turn[1:] 
+                        self.t_turn[-1] = target_steering
+                        count = 0
+                        for i in range(5):
+                            if self.t_turn[i] < -200:
+                                count = count+1
+                            else:
+                                count = count
+                        print(f"count={count}")
+                        if count == 5:
+                            pub_steering = 0
+                        ###############################
 
                         ##### Velocity Conversion #####
                         current_time = rospy.get_time()
@@ -408,6 +425,8 @@ class vehicleController():
                         print("-----")
                         print("target_velocity[m/s]", round(target_velocity, 2))
                         print("target_steering[deg]", round(target_steering, 2))
+
+                        print("pub_steering[deg]", round(pub_steering, 2))
 
                         print("- current_speed   ", round(float(filt_vel), 3))
                         print("- current_accel   ", round(float(acc), 3))

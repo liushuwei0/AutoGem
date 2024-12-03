@@ -8,15 +8,30 @@ import pickle
 
 # feel free to adjust the parameters in the code if necessary
 
+
+# GEM e2 in Gazebo
+image_w   = 640 # px
+image_h   = 480  # px
+lane_w_px = 490  # px
+lane_h_px = 480  # px
+lane_w_m  = 3.1  # m
+lane_h_m  = 10.3 # m
+camera_to_rearwheel = 3.46 # m
+
+
 def find_lane_startP(binary_warped, threshold=50):
+	# selected_area_top = 6*binary_warped.shape[0]//7
+	# selected_area_bottom = 9*binary_warped.shape[0]//10
 	selected_area_top = 6*binary_warped.shape[0]//7
 	selected_area_bottom = 9*binary_warped.shape[0]//10
 	histogram_bottom = np.sum(binary_warped[selected_area_top:selected_area_bottom,:], axis=0)
 	midpoint = int(histogram_bottom.shape[0]/2)
 
 	# Get left and right histograms
-	left_histogram = histogram_bottom[100:midpoint]
-	right_histogram = histogram_bottom[midpoint:-100]
+	# left_histogram = histogram_bottom[100:midpoint]
+	# right_histogram = histogram_bottom[midpoint:-100]
+	left_histogram = histogram_bottom[50:midpoint]
+	right_histogram = histogram_bottom[midpoint:-50]
 	
 	# Compute np.argmax values
 	left_argmax = np.argmax(left_histogram)
@@ -117,9 +132,9 @@ def line_fit(binary_warped):
 			### Detect direction: Upwards
 			y_top = binary_warped.shape[0] - window * window_height
 			y_bottom = binary_warped.shape[0] - (window + 1) * window_height
-			if window == 0:
-				continue
-				# y_top = y_top - window_height//10
+			# if window == 0:
+			# 	continue
+			# 	# y_top = y_top - window_height//10
 
 			leftX_L = leftx_current - margin			# ----- Left Half
 			leftX_R = leftx_current + margin
@@ -154,9 +169,9 @@ def line_fit(binary_warped):
 			y_top = binary_warped.shape[0] - window * window_height
 			y_bottom = binary_warped.shape[0] - (window + 1) * window_height
 
-			if window == 0:
-				continue
-				# y_top = y_top - window_height//10
+			# if window == 0:
+			# 	continue
+			# 	# y_top = y_top - window_height//10
 
 			leftX_L = leftx_current - margin*5			# ----- Only Left Lane needed
 			leftX_R = leftx_current + margin*5
@@ -184,9 +199,9 @@ def line_fit(binary_warped):
 			y_top = binary_warped.shape[0] - window * window_height
 			y_bottom = binary_warped.shape[0] - (window + 1) * window_height
 
-			if window == 0:
-				continue
-				# y_top = y_top - window_height//10
+			# if window == 0:
+			# 	continue
+			# 	# y_top = y_top - window_height//10
 
 			rightX_L = rightx_current - margin*5			# ----- Only Right Lane
 			rightX_R = rightx_current + margin*5
@@ -302,29 +317,30 @@ def line_fit(binary_warped):
 			print("Unable to detect lanes - Right")
 			return None
 	else:
-		#TODO: This is just a copy of two lanes --> Needed to be fixed!
-		# Concatenate the arrays of indices
-		left_lane_inds = np.concatenate(left_lane_inds)
-		right_lane_inds = np.concatenate(right_lane_inds)
+		# 11/22
+		# #TODO: This is just a copy of two lanes --> Needed to be fixed!
+		# # Concatenate the arrays of indices
+		# left_lane_inds = np.concatenate(left_lane_inds)
+		# right_lane_inds = np.concatenate(right_lane_inds)
 
-		# Extract left and right line pixel positions
-		leftx = nonzerox[left_lane_inds]
-		lefty = nonzeroy[left_lane_inds]
-		rightx = nonzerox[right_lane_inds]
-		righty = nonzeroy[right_lane_inds]
+		# # Extract left and right line pixel positions
+		# leftx = nonzerox[left_lane_inds]
+		# lefty = nonzeroy[left_lane_inds]
+		# rightx = nonzerox[right_lane_inds]
+		# righty = nonzeroy[right_lane_inds]
 
-		# Fit a second order polynomial to each using np.polyfit()
-		# If there isn't a good fit, meaning any of leftx, lefty, rightx, and righty are empty,
-		# the second order polynomial is unable to be sovled.
-		# Thus, it is unable to detect edges.
-		try:
-		##TODO
-			left_fit = np.polyfit(lefty, leftx, 2)
-			right_fit = np.polyfit(righty, rightx, 2)
-		####
-		except TypeError:
-			print("Unable to detect lanes - None")
-			return None
+		# # Fit a second order polynomial to each using np.polyfit()
+		# # If there isn't a good fit, meaning any of leftx, lefty, rightx, and righty are empty,
+		# # the second order polynomial is unable to be sovled.
+		# # Thus, it is unable to detect edges.
+		# try:
+		# ##TODO
+		# 	left_fit = np.polyfit(lefty, leftx, 2)
+		# 	right_fit = np.polyfit(righty, rightx, 2)
+		# ####
+		# except TypeError:
+		# 	print("Unable to detect lanes - None")
+		# 	return None
 		pass
 	# Return a dict of relevant variables
 	ret = {}
@@ -549,9 +565,10 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 	# Create an image to draw the lines on
 	#warp_zero = np.zeros_like(warped).astype(np.uint8)
 	#color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
-	color_warp = np.zeros((720, 1280, 3), dtype='uint8')  # NOTE: Hard-coded image dimensions
+	color_warp = np.zeros((image_h, image_w, 3), dtype='uint8')  # NOTE: Hard-coded image dimensions
 
 	# Recast the x and y points into usable format for cv2.fillPoly()
+	pts = None
 	if left_detected:
 		pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
 		pts = pts_left
@@ -562,7 +579,8 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 		pts = np.hstack((pts_left, pts_right))
 
 	# Draw the lane onto the warped blank image
-	cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+	if pts is not None:
+		cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
 
 ##########
 	# middle_fitx = (left_fitx + right_fitx) / 2
@@ -649,10 +667,10 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 
 			# 法線方向にオフセットを適用
 			# offset_point = curr_point + offset * normal
-			#   x: 640 px -> 4.3 m
-			#   y: 480 px -> 10.0 m
-			# 480/10.0*4.3/640 = 0.3225
-			offset_point = curr_point + [offset * normal[0], offset * normal[1] * 0.3225]
+
+			ratio = lane_h_px / lane_h_m * lane_w_m / lane_w_px
+
+			offset_point = curr_point + [offset * normal[0], offset * normal[1] * ratio]
 			offset_arc_points.append(tuple(offset_point))
 
 		return offset_arc_points
@@ -663,54 +681,66 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 		# cv2.polylines(image, [pts], isClosed=False, color=(0, 0, 0), thickness=20)
 		return pts
 
-	# Gazebo --- Road width: 3.1m, 460px => Half width: 1.55m, 230px
-	# GEM --- Road width: 3.1m, 960px => Half width: 1.55m, 480px
+	offset = lane_w_px/2 # for right lane: left offset from original lane
 
-	offset = 230 # for right lane: left offset from original lane
-	if right_fitx[-1] < 640/2: # the closest point of lane is on the left side
+	# If both lanes are detected, choose the one with less variation
+	waypoint=[]
+	if right_detected and left_detected:
+		right_variation = np.std(right_fitx)
+		left_variation = np.std(left_fitx)
+
+		if right_variation < left_variation:
+			left_detected = False
+		else:
+			right_detected = False
+
+	# Generate waypoints from right lane
+	if right_detected:
+		pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, offset)
+		# waypoint_idx = [0,int(len(pts_newway)/2),len(pts_newway)-1]
+		waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+		for i in waypoint_idx:
+			waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+		# print(f'waypoint_black={waypoint}')
+
+	# Generate waypoints from left lane
+	elif left_detected:
 		offset = -offset # for left lane: right offset from original lane
 
-	pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, offset)
-	waypoint=[]
-	# waypoint_idx = [0,int(len(pts_newway)/2),len(pts_newway)-1]
-	waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
-	for i in waypoint_idx:
-		waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
-	# print(f'waypoint_black={waypoint}')
-
-
+		pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, offset)
+		# waypoint_idx = [0,int(len(pts_newway)/2),len(pts_newway)-1]
+		waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+		for i in waypoint_idx:
+			waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+		# print(f'waypoint_black={waypoint}')
 
 	# Conversion from px to m
-	#   x: 640 px -> 4.3 m
-	#   y: 480 px -> 10.0 m
 	# id=0: farest point from gem
-	# id=1: middle point from gem
-	# id=2: nearest point from gem
 	waypoints_m = [] 
-	for (x, y) in waypoint:
-		x_m = x * 4.3 / 640
-		y_m = y * 10.0 / 480
-		waypoints_m.append((float(x_m), float(y_m)))
+	if waypoint:
+		for (x, y) in waypoint:
+			x_m = x * lane_w_m / lane_w_px
+			y_m = y * lane_h_m / lane_h_px
+			waypoints_m.append((float(x_m), float(y_m)))
 
-	# id=3: gem position
-	waypoints_m.append((4.3/2, 10.0 + 3.46))
+		# id=3: gem position
+		birdeye_w_m = lane_w_m * image_w / lane_w_px
+		waypoints_m.append((birdeye_w_m/2, lane_h_m + camera_to_rearwheel))
 
-
-
-	for (x, y) in waypoint:
-		# 將 (x, y) 座標轉換為齊次座標 (x, y, 1)
-		point_homogeneous = np.array([x, y, 1], dtype=np.float32).reshape(3, 1)
-		
-		# 應用逆透視矩陣變換
-		point_transformed = np.dot(m_inv, point_homogeneous)
-		
-		# 轉換回正常的 (x, y) 座標，通過齊次座標除以第三個元素
-		x_transformed = int(point_transformed[0] / point_transformed[2])
-		y_transformed = int(point_transformed[1] / point_transformed[2])
-		
-		# 將轉換後的座標加入新的 waypoints 列表
-		waypoints_transformed.append((x_transformed, y_transformed))
-	# print(f'waypoint_trans={waypoints_transformed}')
+		for (x, y) in waypoint:
+			# 將 (x, y) 座標轉換為齊次座標 (x, y, 1)
+			point_homogeneous = np.array([x, y, 1], dtype=np.float32).reshape(3, 1)
+			
+			# 應用逆透視矩陣變換
+			point_transformed = np.dot(m_inv, point_homogeneous)
+			
+			# 轉換回正常的 (x, y) 座標，通過齊次座標除以第三個元素
+			x_transformed = int(point_transformed[0] / point_transformed[2])
+			y_transformed = int(point_transformed[1] / point_transformed[2])
+			
+			# 將轉換後的座標加入新的 waypoints 列表
+			waypoints_transformed.append((x_transformed, y_transformed))
+		# print(f'waypoint_trans={waypoints_transformed}')
 
 ##########
 
