@@ -27,7 +27,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Image
       Enabled: true
-      Image Topic: /zed2/zed_node/rgb/image_rect_color
+      Image Topic: /oak/rgb/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0

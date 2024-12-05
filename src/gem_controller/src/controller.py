@@ -120,10 +120,10 @@ class vehicleController():
         rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.waypoints_callback)
         self.waypoints = [[2.0,0.0],[2.0,4.0],[2.0,7.0],[2.0,10.0],[2.0,17.0]]
 
-        rospy.Subscriber('Ultralytics/human_detection/detection', Bool, self.yolo_human_callback)
+        rospy.Subscriber('/ultralytics_yolo/human_detection/detected', Bool, self.yolo_human_callback)
         self.detect_human = False
 
-        rospy.Subscriber('Ultralytics/stop_sign_detection/detection', Bool, self.yolo_stopsign_callback)
+        rospy.Subscriber('/ultralytics_yolo/stop_sign_detection/detected', Bool, self.yolo_stopsign_callback)
         self.detect_stopsign         = False
         self.ignore_stopsign_timer   = 0
         self.ignore_stopsign_init    = True
@@ -214,14 +214,18 @@ class vehicleController():
         if abs(vec2_x / vec2_y) > 0.1:
             ld1 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
             angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+            alpha1 = angle_curr_to_wp - np.pi/2
+
+            alpha1 = alpha1 * 2.0
+
         else:
             vec2_x, vec2_y = wp1_x - curr_x, -(wp1_y - curr_y)
 
-            vec2_x = vec2_x * 0.1
+            # vec2_x = vec2_x * 0.1
 
             angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
             ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
-        alpha1 = angle_curr_to_wp - np.pi/2
+            alpha1 = angle_curr_to_wp - np.pi/2
 
 
 
@@ -331,8 +335,8 @@ class vehicleController():
                         while self.detect_human == True:
                             self.detect_human = False
                             ######
-                            throttle_percent = 0.0
-                            self.prev_accel = 0.0
+                            throttle_percent = -10
+                            self.prev_accel = -10
                             # self.accel_cmd.f64_cmd = throttle_percent
                             # self.accel_pub.publish(self.accel_cmd)
                             ######
@@ -351,12 +355,15 @@ class vehicleController():
                             if self.ignore_stopsign_init == True:
                                 print("Stop Sign Detected! Stopping the vehicle")
                                 # Coundown
-                                for i in range(5, 0, -1):
+                                for i in range(10, 0, -1):
                                     ######
                                     throttle_percent = 0.0
                                     self.prev_accel = 0.0
                                     # self.accel_cmd.f64_cmd = throttle_percent
                                     # self.accel_pub.publish(self.accel_cmd)
+                                    self.ackermann_msg.speed = -0.1
+                                    self.ackermann_msg.acceleration = -10000
+                                    self.controlPub.publish(self.ackermann_msg)
                                     ######
                                     print(i)
                                     time.sleep(1)
@@ -367,7 +374,7 @@ class vehicleController():
                             elif self.ignore_stopsign_timer > 0.01:
                                 # Ignore stop sign for waitsec
                                 self.ignore_stopsign_timer -= 1/ self.hz
-                                print("### Ignoring Stop Sign for", round(self.ignore_stopsign_timer, 1), "sec ###")
+                                # print("### Ignoring Stop Sign for", round(self.ignore_stopsign_timer, 1), "sec ###")
                             # Init the timer and restart
                             else:
                                 self.detect_stopsign = False
@@ -377,22 +384,18 @@ class vehicleController():
                         target_velocity = self.longititudal_controller()
                         target_steering = self.pure_pursuit_lateral_controller()
 
-
-
-                        target_velocity = 1.0
-
-
+                        target_velocity = target_velocity * 2.0
 
                         ##### Steering Conversion #####
                         # # Heading angle [rad] to Steering wheel[deg](-630 to 630 deg)
-                        target_steering = np.degrees(target_steering)
+                        target_steering_gazebo = np.degrees(target_steering)
 
                         # print("+ wheel angle[deg]", target_steering)
 
-                        # target_steering = self.front2steer(target_steering)
+                        target_steering = self.front2steer(target_steering_gazebo)
 
                         ########## Increase the steering angle temporarily ###########
-                        target_steering = target_steering * 1.6
+                        # target_steering = target_steering * 1.6
 
                         # 300 deg => 600 deg
                         # 200 deg => 400 deg
@@ -436,7 +439,8 @@ class vehicleController():
                         self.t_turn[-1] = target_steering
                         count = 0
                         for i in range(5):
-                            if self.t_turn[i] < -200:
+                            # if self.t_turn[i] < -200:
+                            if abs(target_steering - self.t_turn[i]) > 200:
                                 count = count+1
                             else:
                                 count = count
@@ -475,7 +479,14 @@ class vehicleController():
                         print("target_steering[deg]", round(target_steering, 2))
                         print("pub_stering[deg]", round(pub_steering, 2))
 
-                        target_steering = np.radians(target_steering)
+
+                        t0d = target_steering_gazebo
+                        t0w = self.front2steer(target_steering_gazebo)
+                        t1w = pub_steering
+                        pub_steering = t0d * t1w / t0w
+
+                        print("Wheel_angle[deg]", round(pub_steering, 2))
+                        target_steering = np.radians(pub_steering)
 
                         # acc = target_velocity - self.speed
 

@@ -24,9 +24,9 @@ class lanenet_detector():
         # NOTE
         # Uncomment this line for lane detection of GEM car in Gazebo
         # # GEMe2
-        self.sub_image = rospy.Subscriber('/zed2/zed_node/rgb/image_rect_color', Image, self.img_callback, queue_size=1)
+        # self.sub_image = rospy.Subscriber('/zed2/zed_node/rgb/image_rect_color', Image, self.img_callback, queue_size=1)
         # # GEMe4
-        # self.sub_image = rospy.Subscriber('/oak/rgb/image_raw', Image, self.img_callback, queue_size=1)
+        self.sub_image = rospy.Subscriber('/oak/rgb/image_raw', Image, self.img_callback, queue_size=1)
 
         # Uncomment this line for lane detection of videos in rosbag
         # self.sub_image = rospy.Subscriber('camera/image_raw', Image, self.img_callback, queue_size=1)
@@ -272,11 +272,13 @@ class lanenet_detector():
         #                 [cols/2 -355-55, rows/2 +169], [cols/2 +355-55, rows/2 +169]])
 
         # GEM e2
-        src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
+        # src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
 
         # GEM e4
         # src = np.float32([[482,416],[657,416],[113,717],[1068,717]])
-        # src = np.float32([[412,516],[757,516],[200,717],[960,717]])
+
+        # GEM e4 narrow
+        src = np.float32([[412,516],[757,516],[200,717],[960,717]])
 
         dst = np.float32([[0, 0], [cols_b, 0], [0, rows_b], [cols_b, rows_b]])
 

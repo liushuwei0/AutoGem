@@ -9,24 +9,26 @@ import pickle
 # feel free to adjust the parameters in the code if necessary
 
 
-# GEM e2
-image_w   = 1280 # px
-image_h   = 720  # px
-lane_w_px = 960  # px
-lane_h_px = 720  # px
-lane_w_m  = 3.1  # m
-lane_h_m  = 10.3 # m
-camera_to_rearwheel = 3.46 # m
+# # GEM e2
+# image_w   = 1280 # px
+# image_h   = 720  # px
+# lane_w_px = 960  # px
+# lane_h_px = 720  # px
+# lane_w_m  = 3.1  # m
+# lane_h_m  = 10.3 # m
+# camera_to_rearwheel = 3.46 # m
 
 
 # GEM e4
-# image_w   = 1152 # px
-# image_h   = 720  # px
-# lane_w_px = 920  # px
-# lane_h_px = 720  # px
-# lane_w_m  = 3.1  # m
-# lane_h_m  = 5.0  # m
-# camera_to_rearwheel = 3.46 # m
+image_w   = 1152 # px
+image_h   = 720  # px
+# lane_w_px = 730  # px
+lane_w_px = 920  # px narrow
+lane_h_px = 720  # px
+lane_w_m  = 3.1  # m
+# lane_h_m  = 10.0  # m
+lane_h_m  = 5.0  # m narrow ### CHECK THIS PARAMETER
+camera_to_rearwheel = 3.46 # m ### CHECK THIS PARAMETER
 
 
 def find_lane_startP(binary_warped, threshold=50):
@@ -38,6 +40,9 @@ def find_lane_startP(binary_warped, threshold=50):
 	# Get left and right histograms
 	left_histogram = histogram_bottom[100:midpoint]
 	right_histogram = histogram_bottom[midpoint:-100]
+	# left_histogram = histogram_bottom[10:midpoint] ### SWITCH IF NEEDED
+	# right_histogram = histogram_bottom[midpoint:-10] ### SWITCH IF NEEDED
+
 	
 	# Compute np.argmax values
 	left_argmax = np.argmax(left_histogram)
@@ -50,6 +55,7 @@ def find_lane_startP(binary_warped, threshold=50):
 	# Apply thresholds
 	if left_max_value >= threshold:
 		left_lane_startP = left_argmax + 100
+		# left_lane_startP = left_argmax + 10 ### SWITCH IF NEEDED
 	else:
 		left_lane_startP = None  # or handle as needed (e.g., skip detection)
 
@@ -100,6 +106,7 @@ def line_fit(binary_warped):
 	out_img = (np.dstack((binary_warped, binary_warped, binary_warped))*255).astype('uint8')
 	# Choose the number of sliding windows
 	nwindows = 9
+	# nwindows = 19 ### SWITCH IF NEEDED
 	# Set height of windows
 	window_height = int(binary_warped.shape[0]/nwindows)
 	# Identify the x and y positions of all nonzero pixels in the image
@@ -108,6 +115,7 @@ def line_fit(binary_warped):
 	nonzerox = np.array(nonzero[1])
 	# Set the width of the windows +/- margin
 	margin = 100
+	# margin = 100 ### SWITCH IF NEEDED
 	# Set minimum number of pixels found to recenter window
 	minpix = 50
 	
@@ -117,6 +125,13 @@ def line_fit(binary_warped):
 	# Create empty lists to receive left and right lane pixel indices
 	left_lane_inds = []
 	right_lane_inds = []
+
+
+	##### Add: Eliminate the aparted lanes #####
+	lefty_current  = image_h
+	righty_current = image_h
+	############################################
+
 
 	# ===== [3] Determine which lane(s) is/are detected at bottom: (Both/Left/Right/Nothing) =====
 	lane_case = "Nothing"
@@ -155,15 +170,43 @@ def line_fit(binary_warped):
 			nonzeroL = ((nonzeroy >= y_bottom) & (nonzeroy < y_top) & (nonzerox >= leftX_L) & (nonzerox < leftX_R)).nonzero()[0] #--- Left Half
 			nonzeroR = ((nonzeroy >= y_bottom) & (nonzeroy < y_top) & (nonzerox >= rightX_L) & (nonzerox < rightX_R)).nonzero()[0] #--- Right Half
 			####
-			# Append these indices to the lists
-			left_lane_inds.append(nonzeroL)			# ----- Left Half
-			right_lane_inds.append(nonzeroR)		# ----- Right Half
-			####
-			# If you found > minpix pixels, recenter next window on their mean 
-			if len(nonzeroL) > minpix:
-				leftx_current = int(np.mean(nonzerox[nonzeroL]))
-			if len(nonzeroR) > minpix:
-				rightx_current = int(np.mean(nonzerox[nonzeroR]))
+
+##########
+			# # Append these indices to the lists
+			# left_lane_inds.append(nonzeroL)			# ----- Left Half
+			# right_lane_inds.append(nonzeroR)		# ----- Right Half
+			# ####
+			# # If you found > minpix pixels, recenter next window on their mean 
+			# if len(nonzeroL) > minpix:
+			# 	leftx_current = int(np.mean(nonzerox[nonzeroL]))
+			# if len(nonzeroR) > minpix:
+			# 	rightx_current = int(np.mean(nonzerox[nonzeroR]))
+########## UNCOMMENT HERE AND COMMENT OUT BELOW IF NEEDED 1/3
+
+			########## Add: Eliminate the aparted lanes ##########
+			if len(nonzeroR) > 0:
+				if abs(rightx_current - int(np.mean(nonzerox[nonzeroR])) ) > 200 or abs(righty_current - int(np.mean(nonzeroy[nonzeroR])) ) > 200:
+					nonzeroR = []
+				else:
+					# Append these indices to the lists
+					right_lane_inds.append(nonzeroR)
+					# If you found > minpix pixels, recenter next window on their mean 
+					if len(nonzeroR) > minpix:
+						rightx_current = int(np.mean(nonzerox[nonzeroR]))
+						righty_current = int(np.mean(nonzeroy[nonzeroR]))
+			if len(nonzeroL) > 0:
+				if abs(leftx_current - int(np.mean(nonzerox[nonzeroL])) ) > 200 or abs(lefty_current - int(np.mean(nonzeroy[nonzeroL])) ) > 200:
+					nonzeroL = []
+				else:
+					# Append these indices to the lists
+					left_lane_inds.append(nonzeroL)
+					# If you found > minpix pixels, recenter next window on their mean 
+					if len(nonzeroL) > minpix:
+						leftx_current = int(np.mean(nonzerox[nonzeroL]))
+						lefty_current = int(np.mean(nonzeroy[nonzeroL]))
+			######################################################
+
+		
 			####
 	# --------------- [3.2] Only Left Lane exits at bottom---------------
 	elif lane_case == "Left":
@@ -188,11 +231,29 @@ def line_fit(binary_warped):
 			# Identify the nonzero pixels in x and y within the window
 			nonzeroL = ((nonzeroy >= y_bottom) & (nonzeroy < y_top) & (nonzerox >= leftX_L) & (nonzerox < leftX_R)).nonzero()[0] 
 			####
-			# Append these indices to the lists
-			left_lane_inds.append(nonzeroL)	
-			# If you found > minpix pixels, recenter next window on their mean 
-			if len(nonzeroL) > minpix:
-				leftx_current = int(np.mean(nonzerox[nonzeroL]))
+
+##########
+			# # Append these indices to the lists
+			# left_lane_inds.append(nonzeroL)	
+			# # If you found > minpix pixels, recenter next window on their mean 
+			# if len(nonzeroL) > minpix:
+			# 	leftx_current = int(np.mean(nonzerox[nonzeroL]))
+########## UNCOMMENT HERE AND COMMENT OUT BELOW IF NEEDED 2/3
+
+			########## Add: Eliminate the aparted lanes ##########
+			if len(nonzeroL) > 0:
+				if abs(leftx_current - int(np.mean(nonzerox[nonzeroL])) ) > 200 or abs(lefty_current - int(np.mean(nonzeroy[nonzeroL])) ) > 200:
+					nonzeroL = []
+				else:
+					# Append these indices to the lists
+					left_lane_inds.append(nonzeroL)
+					# If you found > minpix pixels, recenter next window on their mean 
+					if len(nonzeroL) > minpix:
+						leftx_current = int(np.mean(nonzerox[nonzeroL]))
+						lefty_current = int(np.mean(nonzeroy[nonzeroL]))
+			######################################################
+
+
 			####
 
 	
@@ -219,11 +280,29 @@ def line_fit(binary_warped):
 			# Identify the nonzero pixels in x and y within the window
 			nonzeroR = ((nonzeroy >= y_bottom) & (nonzeroy < y_top) & (nonzerox >= rightX_L) & (nonzerox < rightX_R)).nonzero()[0]
 			####
-			# Append these indices to the lists
-			right_lane_inds.append(nonzeroR)
-			# If you found > minpix pixels, recenter next window on their mean 
-			if len(nonzeroR) > minpix:
-				rightx_current = int(np.mean(nonzerox[nonzeroR]))
+
+##########
+			# # Append these indices to the lists
+			# right_lane_inds.append(nonzeroR)
+			# # If you found > minpix pixels, recenter next window on their mean 
+			# if len(nonzeroR) > minpix:
+			# 	rightx_current = int(np.mean(nonzerox[nonzeroR]))
+########## COMMENT OUT AND ADD BELOW IF NEEDED 3/3
+
+			########## Add: Eliminate the aparted lanes ##########
+			if len(nonzeroR) > 0:
+				if abs(rightx_current - int(np.mean(nonzerox[nonzeroR])) ) > 200 or abs(righty_current - int(np.mean(nonzeroy[nonzeroR])) ) > 200:
+					nonzeroR = []
+				else:
+					# Append these indices to the lists
+					right_lane_inds.append(nonzeroR)
+					# If you found > minpix pixels, recenter next window on their mean 
+					if len(nonzeroR) > minpix:
+						rightx_current = int(np.mean(nonzerox[nonzeroR]))
+						righty_current = int(np.mean(nonzeroy[nonzeroR]))
+			######################################################
+
+
 			####
 	
 
@@ -587,8 +666,8 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 		pts = np.hstack((pts_left, pts_right))
 
 	# Draw the lane onto the warped blank image
-	if pts is not None:
-		cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
+	# if pts is not None:
+		# cv2.fillPoly(color_warp, np.int_([pts]), (0,255, 0))
 
 ##########
 	waypoints_transformed = [] 
@@ -629,13 +708,32 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 	# If both lanes are detected, choose the one with less variation
 	waypoint=[]
 	if right_detected and left_detected:
-		right_variation = np.std(right_fitx)
-		left_variation = np.std(left_fitx)
 
-		if right_variation < left_variation:
+		# right_variation = np.std(right_fitx)
+		# left_variation = np.std(left_fitx)
+
+		# if right_variation < left_variation:
+		# 	left_detected = False
+		# else:
+		# 	right_detected = False
+
+		if len(right_fitx) < 100: ### CHECK THIS PARAMETER
+			right_detected = False
+		elif len(left_fitx) < 100: ### CHECK THIS PARAMETER
 			left_detected = False
 		else:
-			right_detected = False
+			right_variation_s2m = np.std(right_fitx[:int(len(right_fitx)/2)])
+			right_variation_m2e = np.std(right_fitx[int(len(right_fitx)/2):])
+			dif_right_variation = abs(right_variation_s2m - right_variation_m2e)
+			left_variation_s2m = np.std(left_fitx[:int(len(left_fitx)/2)])
+			left_variation_m2e = np.std(left_fitx[int(len(left_fitx)/2):])
+			dif_left_variation = abs(left_variation_s2m - left_variation_m2e)
+			if dif_right_variation < dif_left_variation:
+				left_detected = False
+			else:
+				right_detected = False
+
+
 
 	# Generate waypoints from right lane
 	if right_detected:
@@ -697,15 +795,15 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 ##########
 	#print waypoint on map
 	for (x,y) in waypoints_transformed:
-		cv2.circle(newwarp, (x,y), 5, (0, 0, 255), -1)
-		text = f"({x}, {y})"  # 定義要顯示的文字
-		font = cv2.FONT_HERSHEY_SIMPLEX  # 字體
-		font_scale = 1  # 字體大小
-		color = (255, 0, 0)  # 白色字體
-		thickness = 2  # 字體厚度
+		cv2.circle(newwarp, (x,y), 5, (0, 255, 255), -1)
+		# text = f"({x}, {y})"  # 定義要顯示的文字
+		# font = cv2.FONT_HERSHEY_SIMPLEX  # 字體
+		# font_scale = 1  # 字體大小
+		# color = (255, 0, 0)  # 白色字體
+		# thickness = 2  # 字體厚度
     
 		# 在圖像上指定位置寫文字（可以調整位置，避免與圓點重疊）
-		cv2.putText(newwarp, text, (x + 10, y - 10), font, font_scale, color, thickness)
+		# cv2.putText(newwarp, text, (x + 10, y - 10), font, font_scale, color, thickness)
 ###########
 
 

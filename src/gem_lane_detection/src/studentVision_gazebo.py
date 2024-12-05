@@ -70,7 +70,7 @@ class lanenet_detector():
         y_clip = int(rows//2)
         # y_clip = 3*int(rows//5)
 
-        # raw_img[:y_clip, :] = [60, 60, 60]
+        raw_img[:y_clip, :] = [60, 60, 60]
         # raw_img[:, :x_clip] = [60, 60, 60]
         # raw_img[:, 4*x_clip:] = [60, 60, 60]
 
@@ -268,18 +268,25 @@ class lanenet_detector():
         #                 [cols/2 -355-55, rows/2 +169], [cols/2 +355-55, rows/2 +169]])
 
         # gem-gazebo
-        # 5 m x 4 m
+        # # 5 m x 4 m
         # src = np.float32([[227, 312], [411, 312],\
         #                   [10, 480],  [634, 480]])
+        src = np.float32([[227, 312], [411, 312],\
+                          [0, 480],  [640, 480]])
+
         # 10 m x 4 m
-        src = np.float32([[267, 282], [371, 282],\
-                          [10, 480],  [634, 480]])
+        # src = np.float32([[267, 282], [371, 282],\
+        #                   [10, 480],  [634, 480]])
         dst = np.float32([[0, 0], [cols_b, 0], [0, rows_b], [cols_b, rows_b]])
 
         M = cv2.getPerspectiveTransform(src, dst)
         Minv = np.linalg.inv(M)
 
         warped_img = cv2.warpPerspective(img, M, (cols_b, rows_b)) > 0
+
+        # 変換行列を元に、img全体を鳥瞰図に変換したい
+        
+
 
         ####
 

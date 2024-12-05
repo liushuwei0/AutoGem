@@ -84,11 +84,11 @@ class OnlineFilter(object):
 class vehicleController():
 
     def __init__(self):
-        self.hz = 10
+        self.hz = 5 ### CHECK THIS PARAMETER
         self.rate = rospy.Rate(self.hz)
 
-        self.L = 1.75  # Wheelbase of GEMe2
-        # self.L = 2.56  # Wheelbase of GEMe4
+        # self.L = 1.75  # Wheelbase of GEMe2
+        self.L = 2.56  # Wheelbase of GEMe4
 
         # PID for longitudinal control
         self.desired_speed = 0.3  # m/s
@@ -109,10 +109,10 @@ class vehicleController():
         rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.waypoints_callback)
         self.waypoints = [[2.0,0.0],[2.0,4.0],[2.0,7.0],[2.0,10.0],[2.0,17.0]]
 
-        rospy.Subscriber('Ultralytics/human_detection/detection', Bool, self.yolo_human_callback)
+        rospy.Subscriber('/ultralytics_yolo/human_detection/detected', Bool, self.yolo_human_callback)
         self.detect_human = False
 
-        rospy.Subscriber('Ultralytics/stop_sign_detection/detection', Bool, self.yolo_stopsign_callback)
+        rospy.Subscriber('/ultralytics_yolo/stop_sign_detection/detected', Bool, self.yolo_stopsign_callback)
         self.detect_stopsign         = False
         self.ignore_stopsign_timer   = 0
         self.ignore_stopsign_init    = True
@@ -232,14 +232,18 @@ class vehicleController():
         if abs(vec2_x / vec2_y) > 0.1:
             ld1 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
             angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+            alpha1 = angle_curr_to_wp - np.pi/2
+
+            alpha1 = alpha1 * 2.0 ### CHECK THIS PARAMETER
+
         else:
             vec2_x, vec2_y = wp1_x - curr_x, -(wp1_y - curr_y)
 
-            vec2_x = vec2_x * 0.1
+            # vec2_x = vec2_x * 0.1 ### CHECK THIS PARAMETER
 
             angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
             ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
-        alpha1 = angle_curr_to_wp - np.pi/2
+            alpha1 = angle_curr_to_wp - np.pi/2
 
 
 
@@ -392,7 +396,7 @@ class vehicleController():
                             if self.ignore_stopsign_init == True:
                                 print("Stop Sign Detected! Stopping the vehicle")
                                 # Coundown
-                                for i in range(5, 0, -1):
+                                for i in range(10, 0, -1):
                                     ######
                                     throttle_percent = 0.0
                                     self.prev_accel = 0.0
@@ -408,7 +412,7 @@ class vehicleController():
                             elif self.ignore_stopsign_timer > 0.01:
                                 # Ignore stop sign for waitsec
                                 self.ignore_stopsign_timer -= 1/ self.hz
-                                print("### Ignoring Stop Sign for", round(self.ignore_stopsign_timer, 1), "sec ###")
+                                # print("### Ignoring Stop Sign for", round(self.ignore_stopsign_timer, 1), "sec ###")
                             # Init the timer and restart
                             else:
                                 self.detect_stopsign = False
@@ -428,7 +432,7 @@ class vehicleController():
                         target_steering = self.front2steer(target_steering)
 
                         ########## Increase the steering angle temporarily ###########
-                        target_steering = target_steering * 1.6
+                        # target_steering = target_steering * 1.6 ### CHECK THIS PARAMETER
 
                         # 300 deg => 600 deg
                         # 200 deg => 400 deg
@@ -472,7 +476,8 @@ class vehicleController():
                         self.t_turn[-1] = target_steering
                         count = 0
                         for i in range(5):
-                            if self.t_turn[i] < -200:
+                            # if self.t_turn[i] < -200:
+                            if abs(target_steering - self.t_turn[i]) > 200:
                                 count = count+1
                             else:
                                 count = count
@@ -486,11 +491,11 @@ class vehicleController():
                         filt_vel     = self.speed_filter.get_data(self.speed)
                         acc = self.pid_speed.get_control(current_time, self.desired_speed - filt_vel)
 
-                        thresh_acc       = 0.33
-                        min_acc          = 0.33
-                        throttle_percent = 0.10
+                        thresh_acc       = 0.33 ### CHECK THIS PARAMETER
+                        min_acc          = 0.33 ### CHECK THIS PARAMETER
+                        throttle_percent = 0.10 
 
-                        acc = acc + 0.1
+                        acc = acc + 0.1 ### CHECK THIS PARAMETER
 
                         if acc > self.max_accel:
                             throttle_percent = min(self.prev_accel + 0.005, self.max_accel)
@@ -500,7 +505,7 @@ class vehicleController():
                             else:
                                 throttle_percent = self.prev_accel - 0.005
                         elif acc < 0:
-                            throttle_percent = max(self.prev_accel - 0.005, 0.31)
+                            throttle_percent = max(self.prev_accel - 0.005, 0.31) ### CHECK THIS PARAMETER
                         else:  # 0 < acc < thresh_acc
                             throttle_percent = max(self.prev_accel - 0.005, min_acc)
                         self.prev_accel = throttle_percent
