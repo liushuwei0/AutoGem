@@ -9,7 +9,7 @@ import rospy
 from line_fit import line_fit, tune_fit, bird_fit, final_viz, viz1
 from Line import Line
 from sensor_msgs.msg import Image
-from std_msgs.msg import Header, Float32MultiArray
+from std_msgs.msg import Header, Float32MultiArray, Bool
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32
 from skimage import morphology
@@ -24,9 +24,9 @@ class lanenet_detector():
         # NOTE
         # Uncomment this line for lane detection of GEM car in Gazebo
         # # GEMe2
-        # self.sub_image = rospy.Subscriber('/zed2/zed_node/rgb/image_rect_color', Image, self.img_callback, queue_size=1)
+        self.sub_image = rospy.Subscriber('/zed2/zed_node/rgb/image_rect_color', Image, self.img_callback, queue_size=1)
         # # GEMe4
-        self.sub_image = rospy.Subscriber('/oak/rgb/image_raw', Image, self.img_callback, queue_size=1)
+        # self.sub_image = rospy.Subscriber('/oak/rgb/image_raw', Image, self.img_callback, queue_size=1)
 
         # Uncomment this line for lane detection of videos in rosbag
         # self.sub_image = rospy.Subscriber('camera/image_raw', Image, self.img_callback, queue_size=1)
@@ -45,11 +45,22 @@ class lanenet_detector():
         self.waypoints_msg = Float32MultiArray()
         self.waypoints_msg.data = []
 
+        rospy.Subscriber('/ultralytics_yolo/human_detection/detected', Bool, self.yolo_human_callback)
+        rospy.Subscriber('/ultralytics_yolo/stop_sign_detection/detected', Bool, self.yolo_stopsign_callback)
+        self.detect_human    = False
+        self.detect_stopsign = False
+        self.lane_records    = [0,0]
+
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
         self.detected = False
         self.hist = True
 
+    def yolo_human_callback(self, msg):
+        self.detect_human = msg.data
+
+    def yolo_stopsign_callback(self, msg):
+        self.detect_stopsign = msg.data
 
     def img_callback(self, data):
 
@@ -272,13 +283,13 @@ class lanenet_detector():
         #                 [cols/2 -355-55, rows/2 +169], [cols/2 +355-55, rows/2 +169]])
 
         # GEM e2
-        # src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
+        src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
 
         # GEM e4
         # src = np.float32([[482,416],[657,416],[113,717],[1068,717]])
 
         # GEM e4 narrow
-        src = np.float32([[412,516],[757,516],[200,717],[960,717]])
+        # src = np.float32([[412,516],[757,516],[200,717],[960,717]])
 
         dst = np.float32([[0, 0], [cols_b, 0], [0, rows_b], [cols_b, rows_b]])
 

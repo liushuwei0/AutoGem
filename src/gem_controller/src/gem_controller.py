@@ -87,11 +87,13 @@ class vehicleController():
         self.hz = 5 ### CHECK THIS PARAMETER
         self.rate = rospy.Rate(self.hz)
 
-        # self.L = 1.75  # Wheelbase of GEMe2
-        self.L = 2.56  # Wheelbase of GEMe4
+        self.L = 1.75  # Wheelbase of GEMe2
+        # self.L = 2.56  # Wheelbase of GEMe4
 
         # PID for longitudinal control
-        self.desired_speed = 0.3  # m/s
+        self.desired_speed = 0.3  # m/s, Normal lane following
+        # self.desired_speed = 0.78  # m/s, Stop sign detection
+        # self.desired_speed = 0.4  # m/s, Cone detecion
         self.max_accel = 0.48  # % of acceleration
         self.pid_speed     = PID(0.5, 0.0, 0.1, wg=20)
         self.speed_filter  = OnlineFilter(1.2, 30, 4)
@@ -116,7 +118,7 @@ class vehicleController():
         self.detect_stopsign         = False
         self.ignore_stopsign_timer   = 0
         self.ignore_stopsign_init    = True
-        self.ignore_stopsign_waitsec = 5 # Ignore stop sign for waitsec
+        self.ignore_stopsign_waitsec = 10 # Ignore stop sign for waitsec
 
         #----------------------T turn modify------------------------------
         self.t_turn = [0,0,0,0,0]
@@ -234,18 +236,17 @@ class vehicleController():
             angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
             alpha1 = angle_curr_to_wp - np.pi/2
 
-            alpha1 = alpha1 * 2.0 ### CHECK THIS PARAMETER
+            alpha1 = alpha1 * 1.0 ### CHECK THIS PARAMETER
+            # print("a", alpha1)
 
         else:
             vec2_x, vec2_y = wp1_x - curr_x, -(wp1_y - curr_y)
-
-            # vec2_x = vec2_x * 0.1 ### CHECK THIS PARAMETER
-
+            # vec2_x = vec2_x * 0.5
             angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
             ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
             alpha1 = angle_curr_to_wp - np.pi/2
 
-
+            alpha1 = alpha1 * 0.5 ### CHECK THIS PARAMETER
 
 
 
@@ -378,13 +379,18 @@ class vehicleController():
                             ######
                             throttle_percent = 0.0
                             self.prev_accel = 0.0
-                            self.accel_cmd.f64_cmd = throttle_percent
-                            self.accel_pub.publish(self.accel_cmd)
+                            # self.accel_cmd.f64_cmd = throttle_percent
+                            # self.accel_pub.publish(self.accel_cmd)
+                            self.brake_cmd.f64_cmd = 0.6
+                            self.brake_cmd.enable = True
+                            self.brake_pub.publish(self.brake_cmd)
                             ######
                             time.sleep(2)
                             print("Waiting for the human to move away")
                             # Break when detect_human is still False
-                        
+                        self.brake_cmd.f64_cmd = 0
+                        self.brake_pub.publish(self.brake_cmd)
+                        self.brake_cmd.enable = False
                         print("Restarting the controller")
                     ##############################################
 
@@ -396,15 +402,21 @@ class vehicleController():
                             if self.ignore_stopsign_init == True:
                                 print("Stop Sign Detected! Stopping the vehicle")
                                 # Coundown
-                                for i in range(10, 0, -1):
+                                for i in range(5, 0, -1):
                                     ######
                                     throttle_percent = 0.0
                                     self.prev_accel = 0.0
-                                    self.accel_cmd.f64_cmd = throttle_percent
-                                    self.accel_pub.publish(self.accel_cmd)
+                                    # self.accel_cmd.f64_cmd = throttle_percent
+                                    # self.accel_pub.publish(self.accel_cmd)
+                                    self.brake_cmd.f64_cmd = 0.6
+                                    self.brake_cmd.enable = True
+                                    self.brake_pub.publish(self.brake_cmd)
                                     ######
                                     print(i)
                                     time.sleep(1)
+                                self.brake_cmd.f64_cmd = 0
+                                self.brake_pub.publish(self.brake_cmd)
+                                self.brake_cmd.enable = False
                                 self.ignore_stopsign_timer = self.ignore_stopsign_waitsec
                                 self.ignore_stopsign_init = False
                                 print("Restarting the controller")
@@ -432,7 +444,7 @@ class vehicleController():
                         target_steering = self.front2steer(target_steering)
 
                         ########## Increase the steering angle temporarily ###########
-                        # target_steering = target_steering * 1.6 ### CHECK THIS PARAMETER
+                        target_steering = target_steering * 2.0 ### CHECK THIS PARAMETER
 
                         # 300 deg => 600 deg
                         # 200 deg => 400 deg
@@ -450,10 +462,12 @@ class vehicleController():
                         #############################################################
 
                         # When the steering angle is too large, the steering angle is limited to the maximum value.
-                        if abs(target_steering - self.prev_steer) > 200\
+                        print("+++ ts", target_steering)
+                        if abs(target_steering - self.prev_steer) > 300\
                             and target_steering*self.prev_steer < 0:
                             target_steering = self.prev_steer
 
+                                                                                             
                         # Set the initial steering angle to 0
                         if self.init_steer:
                             target_steering = 0.0
@@ -491,11 +505,17 @@ class vehicleController():
                         filt_vel     = self.speed_filter.get_data(self.speed)
                         acc = self.pid_speed.get_control(current_time, self.desired_speed - filt_vel)
 
-                        thresh_acc       = 0.33 ### CHECK THIS PARAMETER
-                        min_acc          = 0.33 ### CHECK THIS PARAMETER
+                        thresh_acc       = 0.325 ### CHECK THIS PARAMETER
+                        min_acc          = 0.325 ### CHECK THIS PARAMETER
+                        cruise_acc       = 0.300 ### CHECK THIS PARAMETER
+                        
                         throttle_percent = 0.10 
-
                         acc = acc + 0.1 ### CHECK THIS PARAMETER
+                        if filt_vel < target_velocity:
+                            acc = acc + 0.1 ### CHECK THIS PARAMETER
+                            # thresh_acc += 0.1
+                            # min_acc    += 0.1
+                            # cruise_acc += 0.1
 
                         if acc > self.max_accel:
                             throttle_percent = min(self.prev_accel + 0.005, self.max_accel)
@@ -505,7 +525,7 @@ class vehicleController():
                             else:
                                 throttle_percent = self.prev_accel - 0.005
                         elif acc < 0:
-                            throttle_percent = max(self.prev_accel - 0.005, 0.31) ### CHECK THIS PARAMETER
+                            throttle_percent = max(self.prev_accel - 0.005, cruise_acc)
                         else:  # 0 < acc < thresh_acc
                             throttle_percent = max(self.prev_accel - 0.005, min_acc)
                         self.prev_accel = throttle_percent
@@ -531,6 +551,7 @@ class vehicleController():
     
                         self.accel_pub.publish(self.accel_cmd)
                         self.steer_pub.publish(self.steer_cmd)
+                        self.turn_pub.publish(self.turn_cmd)
                     
 
 def pure_pursuit():

@@ -9,7 +9,7 @@ import rospy
 from line_fit_gazebo import line_fit, tune_fit, bird_fit, final_viz, viz1
 from Line import Line
 from sensor_msgs.msg import Image
-from std_msgs.msg import Header, Float32MultiArray
+from std_msgs.msg import Header, Float32MultiArray, Bool
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32
 from skimage import morphology
@@ -39,11 +39,23 @@ class lanenet_detector():
         self.waypoints_msg = Float32MultiArray()
         self.waypoints_msg.data = []
 
+        rospy.Subscriber('/ultralytics_yolo/human_detection/detected', Bool, self.yolo_human_callback)
+        rospy.Subscriber('/ultralytics_yolo/stop_sign_detection/detected', Bool, self.yolo_stopsign_callback)
+        self.detect_human    = False
+        self.detect_stopsign = False
+        self.lane_records    = [0,0]
+        self.timer_start_detour = 0
+
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
         self.detected = False
         self.hist = True
 
+    def yolo_human_callback(self, msg):
+        self.detect_human = msg.data
+
+    def yolo_stopsign_callback(self, msg):
+        self.detect_stopsign = msg.data
 
     def img_callback(self, data):
 
@@ -350,7 +362,20 @@ class lanenet_detector():
             waypoints = []
             if ret is not None:
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
-                combine_fit_img, waypoints = final_viz(img, left_fit, right_fit, Minv)
+                combine_fit_img, waypoints, self.lane_records = final_viz(img, left_fit, right_fit, Minv, self.detect_stopsign, self.lane_records)
+                if self.lane_records == [1,1]:
+                    self.lane_records = [2,2]
+                    self.timer_start_detour = time.time()
+                    print("Finish lane change")
+                elif self.lane_records == [2,2]:
+                    timer_end_detour = time.time()
+                    if timer_end_detour - self.timer_start_detour > 20:
+                        self.lane_records = [3,3]
+                        print("Return to normal lane")
+                elif self.lane_records == [4,4]:
+                    self.lane_records = [0,0]
+                    self.detect_stopsign = False
+                    print("Finish detour")
                 # viz1(img, ret)
             else:
                 print("Unable to detect lanes")

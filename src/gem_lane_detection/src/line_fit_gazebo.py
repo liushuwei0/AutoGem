@@ -611,7 +611,7 @@ def bird_fit(binary_warped, ret, save_file=None):
 	return result
 
 
-def final_viz(undist, left_fit, right_fit, m_inv):
+def final_viz(undist, left_fit, right_fit, m_inv, detect_stopsign=False, lane_records=[0,0]):
 
 	"""
 	Final lane line prediction visualized and overlayed on top of original image
@@ -757,53 +757,147 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 
 	# If both lanes are detected, choose the one with less variation
 	waypoint=[]
-	if right_detected and left_detected:
 
-		# right_variation = np.std(right_fitx)
-		# left_variation = np.std(left_fitx)
 
-		# if right_variation < left_variation:
-		# 	left_detected = False
-		# else:
-		# 	right_detected = False
 
-		if len(right_fitx) < 100:
-			right_detected = False
-		elif len(left_fitx) < 100:
-			left_detected = False
-		else:
-			right_variation_s2m = np.std(right_fitx[:int(len(right_fitx)/2)])
-			right_variation_m2e = np.std(right_fitx[int(len(right_fitx)/2):])
-			dif_right_variation = abs(right_variation_s2m - right_variation_m2e)
-			left_variation_s2m = np.std(left_fitx[:int(len(left_fitx)/2)])
-			left_variation_m2e = np.std(left_fitx[int(len(left_fitx)/2):])
-			dif_left_variation = abs(left_variation_s2m - left_variation_m2e)
-			if dif_right_variation < dif_left_variation:
+	# Generate waypoints for detour (left waypoints from left lane) if stop sign detected
+	if detect_stopsign:
+		# lane_records = [Left detected previously, Lane changed]
+		if lane_records == [0,0]: # First time detecting stop sign
+			# Generate waypoints from right lane with 3x offset (left wpts from left lane)
+			if right_detected:
+				pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, offset*3)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [0,0]
+				print("[LF] Changing lane: right")
+			# Generate waypoints from left lane with -1x offset (left wpts from left lane) 
+			elif left_detected:
+				pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [1,0]
+				print("[LF] Changing lane: left")
+		elif lane_records == [1,0]: # Left lane detected previously
+			# Generate waypoints for normal driving
+			if right_detected:
+				pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [1,1]
+				print("[LF] Finish lane change")
+			elif left_detected:
+				pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [1,0]
+				print("[LF] Changing lane: left")
+		elif lane_records == [2,2]: # Return to original lane when reveive [3,3]
+			if right_detected:
+				pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [2,2]
+				print("[LF] Following switched lane")
+			elif left_detected:
+				pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, -offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [2,2]
+				print("[LF] Following switched lane")
+		elif lane_records == [3,3]: # Return to original lane
+			if left_detected:
+				pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, -3*offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [3,3]
+				print("[LF] Return to original lane: left")
+			elif right_detected:
+				pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, -offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [4,3]
+				print("[LF] Return to original lane: right")
+		elif lane_records == [4,3]:
+			if right_detected:
+				pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, -offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [4,3]
+				print("[LF] Return to original lane: right")
+			elif left_detected:
+				pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, -offset)
+				waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+				for i in waypoint_idx:
+					waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+				lane_records = [4,4]
+				print("[LF] Finish lane change")
+
+
+		print("[LF] Stop sign detected", lane_records)
+
+
+	# Generate waypoints for normal driving
+	else:
+		if right_detected and left_detected:
+
+			# right_variation = np.std(right_fitx)
+			# left_variation = np.std(left_fitx)
+
+			# if right_variation < left_variation:
+			# 	left_detected = False
+			# else:
+			# 	right_detected = False
+
+			if len(right_fitx) < 100:
+				right_detected = False
+			elif len(left_fitx) < 100:
 				left_detected = False
 			else:
-				right_detected = False
+				right_variation_s2m = np.std(right_fitx[:int(len(right_fitx)/2)])
+				right_variation_m2e = np.std(right_fitx[int(len(right_fitx)/2):])
+				dif_right_variation = abs(right_variation_s2m - right_variation_m2e)
+				left_variation_s2m = np.std(left_fitx[:int(len(left_fitx)/2)])
+				left_variation_m2e = np.std(left_fitx[int(len(left_fitx)/2):])
+				dif_left_variation = abs(left_variation_s2m - left_variation_m2e)
+				if dif_right_variation < dif_left_variation:
+					left_detected = False
+				else:
+					right_detected = False
+		
+
+		# Generate waypoints from right lane
+		if right_detected:
+			pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, offset)
+			# waypoint_idx = [0,int(len(pts_newway)/2),len(pts_newway)-1]
+			waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+			for i in waypoint_idx:
+				waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+			# print(f'waypoint_black={waypoint}')
+
+		# Generate waypoints from left lane
+		elif left_detected:
+			offset = -offset # for left lane: right offset from original lane
+
+			pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, offset)
+			# waypoint_idx = [0,int(len(pts_newway)/2),len(pts_newway)-1]
+			waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
+			for i in waypoint_idx:
+				waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
+			# print(f'waypoint_black={waypoint}')
 
 
 
-	# Generate waypoints from right lane
-	if right_detected:
-		pts_newway = draw_offset_arc(color_warp, right_fitx, ploty, offset)
-		# waypoint_idx = [0,int(len(pts_newway)/2),len(pts_newway)-1]
-		waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
-		for i in waypoint_idx:
-			waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
-		# print(f'waypoint_black={waypoint}')
 
-	# Generate waypoints from left lane
-	elif left_detected:
-		offset = -offset # for left lane: right offset from original lane
-
-		pts_newway = draw_offset_arc(color_warp, left_fitx, ploty, offset)
-		# waypoint_idx = [0,int(len(pts_newway)/2),len(pts_newway)-1]
-		waypoint_idx = np.linspace(0, len(pts_newway)-1, 5, dtype=int)
-		for i in waypoint_idx:
-			waypoint.append((int(pts_newway[i][0]), int(pts_newway[i][1])))
-		# print(f'waypoint_black={waypoint}')
 
 	# Conversion from px to m
 	# id=0: farest point from gem
@@ -862,4 +956,4 @@ def final_viz(undist, left_fit, right_fit, m_inv):
 	result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
 
 	# return result
-	return result, waypoints_m
+	return result, waypoints_m, lane_records

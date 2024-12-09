@@ -127,7 +127,7 @@ class vehicleController():
         self.detect_stopsign         = False
         self.ignore_stopsign_timer   = 0
         self.ignore_stopsign_init    = True
-        self.ignore_stopsign_waitsec = 5 # Ignore stop sign for waitsec
+        self.ignore_stopsign_waitsec = 105 # Ignore stop sign for waitsec
 
         #----------------------T turn modify------------------------------
         self.t_turn = [0,0,0,0,0]
@@ -355,7 +355,7 @@ class vehicleController():
                             if self.ignore_stopsign_init == True:
                                 print("Stop Sign Detected! Stopping the vehicle")
                                 # Coundown
-                                for i in range(10, 0, -1):
+                                for i in range(5, 0, -1):
                                     ######
                                     throttle_percent = 0.0
                                     self.prev_accel = 0.0
