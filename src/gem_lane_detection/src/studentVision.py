@@ -91,6 +91,8 @@ class lanenet_detector():
         raw_img[:, :x_clip] = [60, 60, 60]
         raw_img[:, 4*x_clip:] = [60, 60, 60]
 
+        raw_img[rows-20:, :] = [60, 60, 60]
+
         # cv2.imwrite("test.png", raw_img)
         # time.sleep(10000000)
 
@@ -283,7 +285,8 @@ class lanenet_detector():
         #                 [cols/2 -355-55, rows/2 +169], [cols/2 +355-55, rows/2 +169]])
 
         # GEM e2
-        src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
+        # src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
+        src = np.float32([[540,416],[690,416],[300,717],[960,717]])
 
         # GEM e4
         # src = np.float32([[482,416],[657,416],[113,717],[1068,717]])
@@ -362,6 +365,17 @@ class lanenet_detector():
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
                 combine_fit_img, waypoints = final_viz(img, left_fit, right_fit, Minv)
                 # viz1(img, ret)
+
+                # if left_fit is None:
+                #     left_fit = [0, 0, 0]
+                # if right_fit is None:
+                #     right_fit = [0, 0, 0]
+                # linefits = [left_fit[0], left_fit[1], left_fit[2], right_fit[0], right_fit[1], right_fit[2]]
+
+                # linefits = [2.364506304653116e-05, -0.04923174462484201, 223.94522085814225, -5.5157881580171704e-05, 0.026622165839740745, 1161.7379387152469]
+                # print(linefits)
+
+
             else:
                 print("Unable to detect lanes")
 

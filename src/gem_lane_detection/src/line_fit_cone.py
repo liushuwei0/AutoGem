@@ -13,9 +13,11 @@ import pickle
 image_w   = 1280 # px
 image_h   = 720  # px
 lane_w_px = 960  # px
+# lane_w_px = 750  # px
 lane_h_px = 720  # px
 lane_w_m  = 3.1  # m
 lane_h_m  = 10.3 # m
+# lane_h_m  = 5.0 # m
 camera_to_rearwheel = 3.46 # m
 
 
@@ -130,6 +132,7 @@ def line_fit(binary_warped):
 	##### Add: Eliminate the aparted lanes #####
 	lefty_current  = image_h
 	righty_current = image_h
+	max_aparted   = 300
 	############################################
 
 
@@ -185,7 +188,7 @@ def line_fit(binary_warped):
 
 			########## Add: Eliminate the aparted lanes ##########
 			if len(nonzeroR) > 0:
-				if abs(rightx_current - int(np.mean(nonzerox[nonzeroR])) ) > 200 or abs(righty_current - int(np.mean(nonzeroy[nonzeroR])) ) > 200:
+				if abs(rightx_current - int(np.mean(nonzerox[nonzeroR])) ) > max_aparted or abs(righty_current - int(np.mean(nonzeroy[nonzeroR])) ) > max_aparted:
 					nonzeroR = []
 				else:
 					# Append these indices to the lists
@@ -195,7 +198,7 @@ def line_fit(binary_warped):
 						rightx_current = int(np.mean(nonzerox[nonzeroR]))
 						righty_current = int(np.mean(nonzeroy[nonzeroR]))
 			if len(nonzeroL) > 0:
-				if abs(leftx_current - int(np.mean(nonzerox[nonzeroL])) ) > 200 or abs(lefty_current - int(np.mean(nonzeroy[nonzeroL])) ) > 200:
+				if abs(leftx_current - int(np.mean(nonzerox[nonzeroL])) ) > max_aparted or abs(lefty_current - int(np.mean(nonzeroy[nonzeroL])) ) > max_aparted:
 					nonzeroL = []
 				else:
 					# Append these indices to the lists
@@ -242,7 +245,7 @@ def line_fit(binary_warped):
 
 			########## Add: Eliminate the aparted lanes ##########
 			if len(nonzeroL) > 0:
-				if abs(leftx_current - int(np.mean(nonzerox[nonzeroL])) ) > 200 or abs(lefty_current - int(np.mean(nonzeroy[nonzeroL])) ) > 200:
+				if abs(leftx_current - int(np.mean(nonzerox[nonzeroL])) ) > max_aparted or abs(lefty_current - int(np.mean(nonzeroy[nonzeroL])) ) > max_aparted:
 					nonzeroL = []
 				else:
 					# Append these indices to the lists
@@ -291,7 +294,7 @@ def line_fit(binary_warped):
 
 			########## Add: Eliminate the aparted lanes ##########
 			if len(nonzeroR) > 0:
-				if abs(rightx_current - int(np.mean(nonzerox[nonzeroR])) ) > 200 or abs(righty_current - int(np.mean(nonzeroy[nonzeroR])) ) > 200:
+				if abs(rightx_current - int(np.mean(nonzerox[nonzeroR])) ) > max_aparted or abs(righty_current - int(np.mean(nonzeroy[nonzeroR])) ) > max_aparted:
 					nonzeroR = []
 				else:
 					# Append these indices to the lists

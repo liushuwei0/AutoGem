@@ -94,6 +94,7 @@ class vehicleController():
         self.desired_speed = 0.3  # m/s, Normal lane following
         # self.desired_speed = 0.78  # m/s, Stop sign detection
         # self.desired_speed = 0.4  # m/s, Cone detecion
+
         self.max_accel = 0.48  # % of acceleration
         self.pid_speed     = PID(0.5, 0.0, 0.1, wg=20)
         self.speed_filter  = OnlineFilter(1.2, 30, 4)
@@ -109,16 +110,18 @@ class vehicleController():
         self.steer = 0.0 # degrees
 
         rospy.Subscriber('lane_detection/waypoints', Float32MultiArray, self.waypoints_callback)
-        self.waypoints = [[2.0,0.0],[2.0,4.0],[2.0,7.0],[2.0,10.0],[2.0,17.0]]
+        self.waypoints = [[2.0,0.0],[2.0,4.0],[2.0,7.0],[2.0,10.0],[2.0,13.0],[2.0,17.0]]
 
         rospy.Subscriber('/ultralytics_yolo/human_detection/detected', Bool, self.yolo_human_callback)
-        self.detect_human = False
-
         rospy.Subscriber('/ultralytics_yolo/stop_sign_detection/detected', Bool, self.yolo_stopsign_callback)
-        self.detect_stopsign         = False
-        self.ignore_stopsign_timer   = 0
-        self.ignore_stopsign_init    = True
-        self.ignore_stopsign_waitsec = 10 # Ignore stop sign for waitsec
+        rospy.Subscriber('/ultralytics_yolo/cone_detection/detected', Bool, self.yolo_cone_callback)
+
+        self.detect_human    = False
+        self.detect_stopsign = False
+        self.detect_cone     = False
+        self.ignore_timer    = 0
+        self.ignore_init     = True
+        self.ignore_waitsec  = 500 # Ignore stop sign for waitsec
 
         #----------------------T turn modify------------------------------
         self.t_turn = [0,0,0,0,0]
@@ -184,6 +187,9 @@ class vehicleController():
     def yolo_stopsign_callback(self, msg):
         self.detect_stopsign = msg.data
 
+    def yolo_cone_callback(self, msg):
+        self.detect_cone = msg.data
+
     def longititudal_controller(self):
         curr_x, curr_y = self.waypoints[-1]
 
@@ -221,6 +227,7 @@ class vehicleController():
         wp1_x,   wp1_y = self.waypoints[-3]
         wp2_x,   wp2_y = self.waypoints[-4]
         wp3_x,   wp3_y = self.waypoints[-5]
+        wp4_x,   wp4_y = self.waypoints[0]
 
         # print("0", curr_x, curr_y)
         # print("1", wp0_x, wp0_y)
@@ -228,8 +235,43 @@ class vehicleController():
         # print("3", wp2_x, wp2_y)
         # print("4", wp3_x, wp3_y)
 
+        # 大きく曲がっているかを、curr, 1, 3から判定
+        # 差を見る
+        print("wp1_x - curr_x", wp1_x - curr_x)
+        print("wp4_x - wp1_x", wp4_x - wp1_x)
+
         # Look at nearest point for steep curve
+        vec0_x, vec0_y = wp0_x - curr_x, -(wp0_y - curr_y)
         vec2_x, vec2_y = wp2_x - curr_x, -(wp2_y - curr_y)
+
+        # # 1st T turn - turn right
+        # if wp1_x - curr_x < -0.25 and wp4_x - wp1_x > 0.25:
+        #     print("1st T turn - turn right")
+        #     ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
+        #     alpha1 = -1.4
+        # # 2nd T turn - turn left
+        # elif wp1_x - curr_x > 0.25 and wp4_x - wp1_x < -0.25:
+        #     print("2nd T turn - turn left")
+        #     ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
+        #     alpha1 = 1.4
+        # else:
+
+        #     if abs(vec2_x / vec2_y) > 0.1:
+        #         ld1 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
+        #         angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+        #         alpha1 = angle_curr_to_wp - np.pi/2
+
+        #         alpha1 = alpha1 * 1.0 ### CHECK THIS PARAMETER
+        #         # print("a", alpha1)
+
+        #     else:
+        #         # vec2_x = vec2_x * 0.5
+        #         angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+        #         ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
+        #         alpha1 = angle_curr_to_wp - np.pi/2
+
+        #         alpha1 = alpha1 * 0.5 ### CHECK THIS PARAMETER
+
 
         if abs(vec2_x / vec2_y) > 0.1:
             ld1 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
@@ -240,7 +282,6 @@ class vehicleController():
             # print("a", alpha1)
 
         else:
-            vec2_x, vec2_y = wp1_x - curr_x, -(wp1_y - curr_y)
             # vec2_x = vec2_x * 0.5
             angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
             ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
@@ -396,10 +437,10 @@ class vehicleController():
 
                     else:
 
-                        ##### Emergency Stop for Stop Sign Detection #####
+                        ##### Temporary Stop for Stop Sign Detection #####
                         if self.detect_stopsign == True:
                             # Initially stop for 5 sec
-                            if self.ignore_stopsign_init == True:
+                            if self.ignore_init == True:
                                 print("Stop Sign Detected! Stopping the vehicle")
                                 # Coundown
                                 for i in range(5, 0, -1):
@@ -417,18 +458,50 @@ class vehicleController():
                                 self.brake_cmd.f64_cmd = 0
                                 self.brake_pub.publish(self.brake_cmd)
                                 self.brake_cmd.enable = False
-                                self.ignore_stopsign_timer = self.ignore_stopsign_waitsec
-                                self.ignore_stopsign_init = False
+                                self.ignore_timer = self.ignore_waitsec
+                                self.ignore_init = False
                                 print("Restarting the controller")
                             # Ignore stop sign for waitsec
-                            elif self.ignore_stopsign_timer > 0.01:
+                            elif self.ignore_timer > 0.01:
                                 # Ignore stop sign for waitsec
-                                self.ignore_stopsign_timer -= 1/ self.hz
-                                # print("### Ignoring Stop Sign for", round(self.ignore_stopsign_timer, 1), "sec ###")
+                                self.ignore_timer -= 1/ self.hz
+                                # print("### Ignoring Stop Sign for", round(self.ignore_timer, 1), "sec ###")
                             # Init the timer and restart
                             else:
                                 self.detect_stopsign = False
-                                self.ignore_stopsign_init = True
+                                self.ignore_init = True
+                        ##################################################
+
+                        ##### Temporary Stop for Cone Detection #####
+                        if self.detect_cone == True:
+                            # Initially stop for 5 sec
+                            if self.ignore_init == True:
+                                print("Cone Detected! Stopping the vehicle")
+                                # Coundown
+                                for i in range(3, 0, -1):
+                                    ######
+                                    throttle_percent = 0.0
+                                    self.prev_accel = 0.0
+                                    self.brake_cmd.f64_cmd = 0.6
+                                    self.brake_cmd.enable = True
+                                    self.brake_pub.publish(self.brake_cmd)
+                                    ######
+                                    print(i)
+                                    time.sleep(1)
+                                self.brake_cmd.f64_cmd = 0
+                                self.brake_pub.publish(self.brake_cmd)
+                                self.brake_cmd.enable = False
+                                self.ignore_timer = self.ignore_waitsec
+                                self.ignore_init = False
+                                print("Restarting the controller")
+                            # Ignore stop sign for waitsec
+                            elif self.ignore_timer > 0.01:
+                                # Ignore stop sign for waitsec
+                                self.ignore_timer -= 1/ self.hz
+                            # Init the timer and restart
+                            else:
+                                self.detect_cone = False
+                                self.ignore_init = True
                         ##################################################
 
                         target_velocity = self.longititudal_controller()

@@ -52,7 +52,6 @@ def calculate_offsets(center_x, center_y, distance):
     vertical_offset = (center_y - IMAGE_HEIGHT / 2) * distance / FOCAL_LENGTH
     return lateral_offset, vertical_offset
 
-
 def callback(data):
     """Callback function to process image and publish annotated images."""
     array = ros_numpy.numpify(data)
@@ -73,67 +72,73 @@ def callback(data):
     for box in det_result[0].boxes:
         class_id = box.cls.cpu().numpy()
         class_name = detection_model.names[int(class_id)]  # Convert ID to class name
-        if class_name == "stop sign":
-            xyxy = box.xyxy.cpu().numpy()
 
-            w, h = xyxy[0][2]-xyxy[0][0], xyxy[0][3]-xyxy[0][1]
-            x, y = xyxy[0][0]+w/2, xyxy[0][1]+h/2
-            print("Size of stop sign:", w, h)
-            print("Center of stop sign:", x, y)
 
-            distance = calculate_distance(STOP_SIGN_HEIGHT, h)
-            lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
-            print("Distance to stop sign:", distance)
-            print("Lateral offset:", lateral_offset)
+        # if class_name == "stop sign":
+        #     xyxy = box.xyxy.cpu().numpy()
 
-            # confidence = box.conf.numpy()
-            # rospy.loginfo(f"Detected: {class_name}, Confidence: {confidence}, Box: {xyxy}")
+        #     w, h = xyxy[0][2]-xyxy[0][0], xyxy[0][3]-xyxy[0][1]
+        #     x, y = xyxy[0][0]+w/2, xyxy[0][1]+h/2
+        #     print("Size of stop sign:", w, h)
+        #     print("Center of stop sign:", x, y)
 
-            if w > 90 and h > 90: ### CHECK THIS PARAMETER
-                # stop_signal_pub.publish(True)
-                rospy.loginfo("Stop Sign Detected!")
+        #     distance = calculate_distance(STOP_SIGN_HEIGHT, h)
+        #     lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
+        #     print("Distance to stop sign:", distance)
+        #     print("Lateral offset:", lateral_offset)
 
-        if class_name == "person":
-            xyxy = box.xyxy.cpu().numpy()
+        #     # confidence = box.conf.cpu().numpy()
+        #     # rospy.loginfo(f"Detected: {class_name}, Confidence: {confidence}, Box: {xyxy}")
 
-            w, h = xyxy[0][2]-xyxy[0][0], xyxy[0][3]-xyxy[0][1]
-            x, y = xyxy[0][0]+w/2, xyxy[0][1]+h/2
-            print("Size of human:", w, h)
-            print("Center of human:", x, y)
+        #     if w > 90 and h > 90: ### CHECK THIS PARAMETER
+        #         # stop_signal_pub.publish(True)
+        #         rospy.loginfo("Stop Sign Detected!")
 
-            distance = calculate_distance(HUMAN_HEIGHT, h)
-            lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
-            print("Distance to human:", distance)
-            print("Lateral offset:", lateral_offset)
 
-            # confidence = box.conf.numpy()
-            # rospy.loginfo(f"Detected: {class_name}, Confidence: {confidence}, Box: {xyxy}")
+        # if class_name == "person":
+        #     xyxy = box.xyxy.cpu().numpy()
 
-            if w > 50 and h > 150: ### CHECK THIS PARAMETER
-                # human_pub.publish(True)
-                # stop_signal_pub.publish(True)
-                rospy.loginfo("Human Detected!")
+        #     w, h = xyxy[0][2]-xyxy[0][0], xyxy[0][3]-xyxy[0][1]
+        #     x, y = xyxy[0][0]+w/2, xyxy[0][1]+h/2
+        #     print("Size of human:", w, h)
+        #     print("Center of human:", x, y)
+
+        #     distance = calculate_distance(HUMAN_HEIGHT, h)
+        #     lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
+        #     print("Distance to human:", distance)
+        #     print("Lateral offset:", lateral_offset)
+
+        #     # confidence = box.conf.cpu().numpy()
+        #     # rospy.loginfo(f"Detected: {class_name}, Confidence: {confidence}, Box: {xyxy}")
+
+        #     if w > 50 and h > 150: ### CHECK THIS PARAMETER
+        #         # human_pub.publish(True)
+        #         # stop_signal_pub.publish(True)
+        #         rospy.loginfo("Human Detected!")
+
 
         if class_name == "cone":
             xyxy = box.xyxy.cpu().numpy()
 
             w, h = xyxy[0][2]-xyxy[0][0], xyxy[0][3]-xyxy[0][1]
             x, y = xyxy[0][0]+w/2, xyxy[0][1]+h/2
+            print("----- CONE -----")
             print("Size of cone:", w, h)
             print("Center of cone:", x, y)
 
-            distance = calculate_distance(CONE_HEIGHT, h)
-            lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
-            print("Distance to cone:", distance)
-            print("Lateral offset:", lateral_offset)
+            # distance = calculate_distance(CONE_HEIGHT, h)
+            # lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
+            # print("Distance to cone:", distance)
+            # print("Lateral offset:", lateral_offset)
 
-            # confidence = box.conf.numpy()
+            # confidence = box.conf.cpu().numpy()
             # rospy.loginfo(f"Detected: {class_name}, Confidence: {confidence}, Box: {xyxy}")
 
             if w > 69 and h > 79: ### CHECK THIS PARAMETER
                 # stop_signal_pub.publish(True)
                 cone_pub.publish(True)
                 rospy.loginfo("Cone Detected!")
+
 
 # rospy.Subscriber("/camera/color/image_raw", Image, callback)
 # rospy.Subscriber("/front_single_camera/image_raw", Image, callback)

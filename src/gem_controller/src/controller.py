@@ -201,6 +201,7 @@ class vehicleController():
         wp1_x,   wp1_y = self.waypoints[-3]
         wp2_x,   wp2_y = self.waypoints[-4]
         wp3_x,   wp3_y = self.waypoints[-5]
+        wp4_x,   wp4_y = self.waypoints[0]
 
         # print("0", curr_x, curr_y)
         # print("1", wp0_x, wp0_y)
@@ -208,24 +209,39 @@ class vehicleController():
         # print("3", wp2_x, wp2_y)
         # print("4", wp3_x, wp3_y)
 
+        # 大きく曲がっているかを、curr, 1, 3から判定
+        # 差を見る
+        print("wp1_x - curr_x", wp1_x - curr_x)
+        print("wp4_x - wp1_x", wp4_x - wp1_x)
+
         # Look at nearest point for steep curve
+        vec0_x, vec0_y = wp0_x - curr_x, -(wp0_y - curr_y)
         vec2_x, vec2_y = wp2_x - curr_x, -(wp2_y - curr_y)
 
-        if abs(vec2_x / vec2_y) > 0.1:
-            ld1 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
-            angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
-            alpha1 = angle_curr_to_wp - np.pi/2
-
-            alpha1 = alpha1 * 2.0
-
+        # 1st T turn - turn right
+        if wp1_x - curr_x < -0.25 and wp4_x - wp1_x > 0.25:
+            print("1st T turn - turn right")
+            ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
+            alpha1 = -1.4
+        # 2nd T turn - turn left
+        elif wp1_x - curr_x > 0.25 and wp4_x - wp1_x < -0.25:
+            print("2nd T turn - turn left")
+            ld1 = np.sqrt((wp0_x - curr_x)**2 + (wp0_y - curr_y)**2)
+            alpha1 = 1.4
         else:
-            vec2_x, vec2_y = wp1_x - curr_x, -(wp1_y - curr_y)
 
-            # vec2_x = vec2_x * 0.1
+            if abs(vec2_x / vec2_y) > 0.1:
+                ld1 = np.sqrt((wp2_x - curr_x)**2 + (wp2_y - curr_y)**2)
+                angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+                alpha1 = angle_curr_to_wp - np.pi/2
 
-            angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
-            ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
-            alpha1 = angle_curr_to_wp - np.pi/2
+                alpha1 = alpha1 * 2.0
+
+            else:
+                # vec2_x = vec2_x * 0.1
+                angle_curr_to_wp  = np.arctan2(vec2_y, vec2_x)
+                ld1 = np.sqrt((wp1_x - curr_x)**2 + (wp1_y - curr_y)**2)
+                alpha1 = angle_curr_to_wp - np.pi/2
 
 
 

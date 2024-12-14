@@ -14,7 +14,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from skimage import morphology
 from std_msgs.msg import Header, Float32MultiArray, Bool
 
-from line_fit_cone import line_fit, tune_fit, bird_fit, final_viz, viz1
+from line_fit import line_fit, tune_fit, bird_fit, final_viz, viz1
 from std_msgs.msg import Header
 from std_msgs.msg import Float32
 import matplotlib.pyplot as plt
@@ -48,15 +48,9 @@ class CombinedDetector:
         self.waypoints_msg = Float32MultiArray()
         self.waypoints_msg.data = []
 
-        rospy.Subscriber('/ultralytics_yolo/human_detection/detected', Bool, self.yolo_human_callback)
-        rospy.Subscriber('/ultralytics_yolo/stop_sign_detection/detected', Bool, self.yolo_stopsign_callback)
-        rospy.Subscriber('/ultralytics_yolo/cone_detection/detected', Bool, self.yolo_cone_callback)
-        self.detect_human     = False
-        self.detect_stopsign  = False
-        self.detect_cone      = False
-        self.detect_cone_curr = False
-        self.lane_records     = [0,0]
-        self.timer_start_detour = 0
+        self.pub_linefits  = rospy.Publisher('lane_detection/linefits', Float32MultiArray, queue_size=1)
+        self.linefits_msg = Float32MultiArray()
+        self.linefits_msg.data = []
 
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
@@ -80,15 +74,6 @@ class CombinedDetector:
         # ROS Subscriber
         rospy.Subscriber('/zed2/zed_node/rgb/image_rect_color', Image, self.img_callback, queue_size=1)
 
-    def yolo_human_callback(self, msg):
-        self.detect_human = msg.data
-
-    def yolo_stopsign_callback(self, msg):
-        self.detect_stopsign = msg.data
-
-    def yolo_cone_callback(self, msg):
-        self.detect_cone      = msg.data
-        self.detect_cone_curr = msg.data
 
     # Added: postprocess masks
     def postprocess_masks(self, masks, image):
@@ -309,8 +294,14 @@ class CombinedDetector:
 
         # Move the top/bottom-right point further right
         # src = np.float32([[410,516],[860,516],[200,717],[1156,717]])
+        
+        # GEM e2 Dec 8
+        # src = np.float32([[370,516],[880,516],[100,717],[1156,717]])
+
+        # src = np.float32([[410,516],[860,516],[200,717],[1156,717]])
         src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
 
+        # src = np.float32([[540,416],[690,416],[300,717],[960,717]])
 
         dst = np.float32([[0, 0], [cols_b, 0], [0, rows_b], [cols_b, rows_b]])
 
@@ -381,25 +372,20 @@ class CombinedDetector:
             waypoints = []
             if ret is not None:
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
-                combine_fit_img, waypoints, self.lane_records = final_viz(img, left_fit, right_fit, Minv, self.detect_cone, self.lane_records)
-                if self.lane_records == [1,1]:
-                    self.lane_records = [2,2]
-                    self.timer_start_detour = time.time()
-                    print("Finish lane change")
+                combine_fit_img, waypoints = final_viz(img, left_fit, right_fit, Minv)
 
-                    self.detect_cone_curr = False
+                # Publish line fits
+                # if left_fit is None:
+                #     left_fit = [0, 0, 0]
+                # if right_fit is None:
+                #     right_fit = [0, 0, 0]
+                # linefits = [left_fit[0], left_fit[1], left_fit[2], right_fit[0], right_fit[1], right_fit[2]]
 
-                elif self.lane_records == [2,2]:
-                    timer_end_detour = time.time()
-                    if timer_end_detour - self.timer_start_detour > 30:
-                    # if timer_end_detour - self.timer_start_detour > 20 and self.detect_cone_curr == True:
-                        self.lane_records = [3,3]
-                        print("Return to normal lane")
-                elif self.lane_records == [4,4]:
-                    self.lane_records = [0,0]
-                    self.detect_cone = False
-                    self.detect_cone_curr = False
-                    print("Finish detour")
+                linefits = [2.364506304653116e-05, -0.04923174462484201, 223.94522085814225, -5.5157881580171704e-05, 0.026622165839740745, 1161.7379387152469]
+
+                self.linefits_msg.data = linefits
+                self.pub_linefits.publish(self.linefits_msg)
+
                 # viz1(img, ret)
             else:
                 print("Unable to detect lanes")

@@ -29,12 +29,13 @@ class CombinedDetector:
         # YOLOpv2 initialization
         rospy.loginfo("Loading YOLOpv2 model...")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        rospy.loginfo(f"Using device: {self.device}")
         try:
             rospack = rospkg.RosPack()
             package_path = rospack.get_path('gem_lane_detection')
             model_path = f"{package_path}/src/yolopv2.pt"
-            self.segmentation_model = torch.jit.load(model_path).to(self.device)
-            # self.segmentation_model = torch.jit.load("./yolopv2.pt").to(self.device)
+            self.segmentation_model = torch.jit.load(model_path, map_location=self.device).to(self.device)
+            # self.segmentation_model = torch.jit.load("./yolopv2.pt", map_location=self.device).to(self.device)
             self.segmentation_model.eval()
             rospy.loginfo("YOLOpv2 model loaded successfully.")
         except RuntimeError as e:
@@ -46,6 +47,10 @@ class CombinedDetector:
         self.pub_waypoints = rospy.Publisher('lane_detection/waypoints', Float32MultiArray, queue_size=1)
         self.waypoints_msg = Float32MultiArray()
         self.waypoints_msg.data = []
+
+        self.pub_linefits  = rospy.Publisher('lane_detection/linefits', Float32MultiArray, queue_size=1)
+        self.linefits_msg = Float32MultiArray()
+        self.linefits_msg.data = []
 
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
@@ -70,16 +75,12 @@ class CombinedDetector:
         rospy.Subscriber('/zed2/zed_node/rgb/image_rect_color', Image, self.img_callback, queue_size=1)
 
 
-    # Added: postprocess_masks
+    # Added: postprocess masks
     def postprocess_masks(self, masks, image):
-        # Convert masks to binary format
         binary_masks = (masks > 0.5).astype(np.uint8) * 255
-        
-        # Filter out non-white areas
-        for i in range(binary_masks.shape[0]):
-            mask = binary_masks[i]
-            white_mask = cv2.inRange(image, (150, 150, 150), (255, 255, 255))
-            binary_masks[i] = cv2.bitwise_and(mask, mask, mask=white_mask)
+        image_resized = cv2.resize(image, (binary_masks.shape[1], binary_masks.shape[0]), interpolation=cv2.INTER_LINEAR)
+        white_mask = cv2.inRange(image_resized, (140, 140, 140), (255, 255, 255))
+        binary_masks = cv2.bitwise_and(binary_masks, binary_masks, mask=white_mask)
         
         return binary_masks
 
@@ -371,6 +372,19 @@ class CombinedDetector:
             if ret is not None:
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
                 combine_fit_img, waypoints = final_viz(img, left_fit, right_fit, Minv)
+
+                # Publish line fits
+                # if left_fit is None:
+                #     left_fit = [0, 0, 0]
+                # if right_fit is None:
+                #     right_fit = [0, 0, 0]
+                # linefits = [left_fit[0], left_fit[1], left_fit[2], right_fit[0], right_fit[1], right_fit[2]]
+
+                linefits = [2.364506304653116e-05, -0.04923174462484201, 223.94522085814225, -5.5157881580171704e-05, 0.026622165839740745, 1161.7379387152469]
+
+                self.linefits_msg.data = linefits
+                self.pub_linefits.publish(self.linefits_msg)
+
                 # viz1(img, ret)
             else:
                 print("Unable to detect lanes")
