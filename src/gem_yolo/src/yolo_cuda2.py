@@ -5,11 +5,7 @@ import ros_numpy
 import rospy
 
 from sensor_msgs.msg import Image
-<<<<<<< HEAD
 from std_msgs.msg import Bool, Float32MultiArray
-=======
-from std_msgs.msg import Bool
->>>>>>> 13cdc629c41e3c3b9749eeccf13f6e10a1527ebd
 
 import torch
 from ultralytics import YOLO
@@ -18,24 +14,17 @@ import rospkg
 from line_fit import line_fit, tune_fit, bird_fit, final_viz, viz1
 from Line import Line
 
-<<<<<<< HEAD
 import numpy as np
 import cv2
 
-=======
->>>>>>> 13cdc629c41e3c3b9749eeccf13f6e10a1527ebd
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 rospy.loginfo(f"Running YOLO model on device: {device}")
 time.sleep(1)
 
 rospack = rospkg.RosPack()
 package_path = rospack.get_path('gem_yolo')
-<<<<<<< HEAD
 # model_path = f"{package_path}/weight/best.pt" # CONE!!!!!
 model_path = f"{package_path}/weight/yolov8m.pt"
-=======
-model_path = f"{package_path}/weight/best.pt"
->>>>>>> 13cdc629c41e3c3b9749eeccf13f6e10a1527ebd
 detection_model = YOLO(model_path)
 # segmentation_model = YOLO("../weight/yolov8m-seg.pt")
 
@@ -88,7 +77,6 @@ def safe_zone(left_fit, right_fit, person_x, person_y, expand_margin=100):
     safe_zone_mask = np.zeros((IMAGE_HEIGHT, IMAGE_WIDTH), dtype=np.uint8)
     cv2.fillPoly(safe_zone_mask, np.int_([expanded_pts]), 255)
 
-<<<<<<< HEAD
 
 
     src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
@@ -104,13 +92,10 @@ def safe_zone(left_fit, right_fit, person_x, person_y, expand_margin=100):
     if person_x < 0 or person_x >= IMAGE_WIDTH:
         return False
 
-=======
->>>>>>> 13cdc629c41e3c3b9749eeccf13f6e10a1527ebd
     # this returns bool (true/false)
     return safe_zone_mask[int(person_y), int(person_x)] > 0
 
 
-<<<<<<< HEAD
 def callback_linefits(data):
     global left_fit, right_fit
     left_fit = data.data[:3]
@@ -120,8 +105,6 @@ def callback_linefits(data):
     print("Right fit:", right_fit)
     
 
-=======
->>>>>>> 13cdc629c41e3c3b9749eeccf13f6e10a1527ebd
 def callback(data):
     """Callback function to process image and publish annotated images."""
     array = ros_numpy.numpify(data)
@@ -201,11 +184,13 @@ def callback(data):
             # MAX_STOP_DISTANCE = 5.0 (can also use distance <= MAX_STOP_DISTANCE)
 
             # Check if the person is within the safe region
-<<<<<<< HEAD
-            inside_safe_zone = safe_zone(left_fit, right_fit, x, y, expand_margin=0)
-=======
-            inside_safe_zone = safe_zone(left_fit, right_fit, x, y, expand_margin=100)
->>>>>>> 13cdc629c41e3c3b9749eeccf13f6e10a1527ebd
+            # inside_safe_zone = safe_zone(left_fit, right_fit, x, y, expand_margin=0)
+            ll_x, ll_y = xyxy[0][0], xyxy[0][3]
+            lr_x, lr_y = xyxy[0][2], xyxy[0][3]
+            inside_safe_zone_ll = safe_zone(left_fit, right_fit, ll_x, ll_y, expand_margin=0)
+            inside_safe_zone_lr = safe_zone(left_fit, right_fit, lr_x, lr_y, expand_margin=0)
+            inside_safe_zone = inside_safe_zone_ll or inside_safe_zone_lr
+
 
             if inside_safe_zone and w > 50 and h > 150:
                 human_pub.publish(True)
@@ -246,10 +231,7 @@ def callback(data):
 rospy.Subscriber("/zed2/zed_node/rgb/image_rect_color", Image, callback)
 # rospy.Subscriber("/oak/rgb/image_raw", Image, callback)
 
-<<<<<<< HEAD
 rospy.Subscriber("/lane_detection/linefits", Float32MultiArray, callback_linefits)
 
-=======
->>>>>>> 13cdc629c41e3c3b9749eeccf13f6e10a1527ebd
 while True:
     rospy.spin()
