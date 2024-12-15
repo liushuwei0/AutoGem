@@ -21,7 +21,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 rospy.loginfo(f"Running YOLO model on device: {device}")
 time.sleep(1)
 
-rospack = rospkg.RosPack()
+rospack = rospkg.RosPack()  
 package_path = rospack.get_path('gem_yolo')
 # model_path = f"{package_path}/weight/best.pt" # CONE!!!!!
 model_path = f"{package_path}/weight/yolov8m.pt"
@@ -79,7 +79,9 @@ def safe_zone(left_fit, right_fit, person_x, person_y, expand_margin=100):
 
 
 
-    src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
+    # src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
+    src = np.float32([[610,216],[630,216],[200,717],[1056,717]])
+
     # src = np.float32([[540,416],[690,416],[300,717],[960,717]])
 
     dst = np.float32([[0, 0], [IMAGE_WIDTH, 0], [0, IMAGE_HEIGHT], [IMAGE_WIDTH, IMAGE_HEIGHT]])
@@ -101,8 +103,8 @@ def callback_linefits(data):
     left_fit = data.data[:3]
     right_fit = data.data[3:]
 
-    print("Left fit:", left_fit)
-    print("Right fit:", right_fit)
+    # print("Left fit:", left_fit)
+    # print("Right fit:", right_fit)
     
 
 def callback(data):
@@ -121,6 +123,9 @@ def callback(data):
     #     seg_result = segmentation_model(array)
     #     seg_annotated = seg_result[0].plot(show=False)
     #     seg_image_pub.publish(ros_numpy.msgify(Image, seg_annotated, encoding="rgb8"))
+
+    flag_person_inside = False
+    flag_person_outside =False
 
     for box in det_result[0].boxes:
         class_id = box.cls.cpu().numpy()
@@ -145,64 +150,70 @@ def callback(data):
                 # stop_signal_pub.publish(True)
                 rospy.loginfo("Stop Sign Detected!")
 
-        # if class_name == "person":
-        #     xyxy = box.xyxy.cpu().numpy()
-
-        #     w, h = xyxy[0][2]-xyxy[0][0], xyxy[0][3]-xyxy[0][1]
-        #     x, y = xyxy[0][0]+w/2, xyxy[0][1]+h/2
-        #     print("Size of human:", w, h)
-        #     print("Center of human:", x, y)
-
-        #     distance = calculate_distance(HUMAN_HEIGHT, h)
-        #     lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
-        #     print("Distance to human:", distance)
-        #     print("Lateral offset:", lateral_offset)
-
-        #     # confidence = box.conf.numpy()
-        #     # rospy.loginfo(f"Detected: {class_name}, Confidence: {confidence}, Box: {xyxy}")
-
-        #     if w > 50 and h > 150: ### CHECK THIS PARAMETER
-        #         human_pub.publish(True)
-        #         # stop_signal_pub.publish(True)
-        #         rospy.loginfo("Human Detected!")
-                
-        #------------------ Safe region + distance--------------
         if class_name == "person":
             xyxy = box.xyxy.cpu().numpy()
-            w, h = xyxy[0][2] - xyxy[0][0], xyxy[0][3] - xyxy[0][1]
-            x, y = xyxy[0][0] + w / 2, xyxy[0][1] + h / 2
 
+            w, h = xyxy[0][2]-xyxy[0][0], xyxy[0][3]-xyxy[0][1]
+            x, y = xyxy[0][0]+w/2, xyxy[0][1]+h/2
             print("Size of human:", w, h)
             print("Center of human:", x, y)
 
-            # Check distance to human
             distance = calculate_distance(HUMAN_HEIGHT, h)
             lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
             print("Distance to human:", distance)
             print("Lateral offset:", lateral_offset)
 
-            # MAX_STOP_DISTANCE = 5.0 (can also use distance <= MAX_STOP_DISTANCE)
+            # confidence = box.conf.numpy()
+            # rospy.loginfo(f"Detected: {class_name}, Confidence: {confidence}, Box: {xyxy}")
 
-            # Check if the person is within the safe region
-            # inside_safe_zone = safe_zone(left_fit, right_fit, x, y, expand_margin=0)
-            ll_x, ll_y = xyxy[0][0], xyxy[0][3]
-            lr_x, lr_y = xyxy[0][2], xyxy[0][3]
-            inside_safe_zone_ll = safe_zone(left_fit, right_fit, ll_x, ll_y, expand_margin=0)
-            inside_safe_zone_lr = safe_zone(left_fit, right_fit, lr_x, lr_y, expand_margin=0)
-            inside_safe_zone = inside_safe_zone_ll or inside_safe_zone_lr
-
-
-            if inside_safe_zone and w > 50 and h > 150:
+            if w > 50 and h > 150: ### CHECK THIS PARAMETER
                 human_pub.publish(True)
-                rospy.loginfo("Person in safe zone. Car stopping...")
-            else:
-                if not inside_safe_zone:
-                    rospy.loginfo("Person outside safe zone.")
-                if w <= 50 or h <= 150:
-                    rospy.loginfo("Person too far")
-                human_pub.publish(False)
-                # rospy.loginfo("Car moving...")
+                # stop_signal_pub.publish(True)
+                rospy.loginfo("Human Detected!")
+                
+        #------------------ Safe region + distance--------------
+        if class_name == "person":
+                xyxy = box.xyxy.cpu().numpy()
+                w, h = xyxy[0][2] - xyxy[0][0], xyxy[0][3] - xyxy[0][1]
+                x, y = xyxy[0][0] + w / 2, xyxy[0][1] + h / 2
 
+                print("Size of human:", w, h)
+                print("Center of human:", x, y)
+
+                # Check distance to human
+                distance = calculate_distance(HUMAN_HEIGHT, h)
+                lateral_offset, vertical_offset = calculate_offsets(x, y, distance)
+                print("Distance to human:", distance)
+                print("Lateral offset:", lateral_offset)
+
+                # MAX_STOP_DISTANCE = 5.0 (can also use distance <= MAX_STOP_DISTANCE)
+
+                # Check if the person is within the safe region
+                # inside_safe_zone = safe_zone(left_fit, right_fit, x, y, expand_margin=0)
+                ll_x, ll_y = xyxy[0][0], xyxy[0][3]
+                lr_x, lr_y = xyxy[0][2], xyxy[0][3]
+                inside_safe_zone_ll = safe_zone(left_fit, right_fit, ll_x, ll_y, expand_margin=10)
+                inside_safe_zone_lr = safe_zone(left_fit, right_fit, lr_x, lr_y, expand_margin=10)
+                inside_safe_zone = inside_safe_zone_ll or inside_safe_zone_lr
+
+
+                # if inside_safe_zone and w > 50 and h > 150:
+                if inside_safe_zone:
+                    # human_pub.publish(True)
+                    rospy.loginfo("Person in safe zone. Car stopping...")
+                    flag_person_inside = True
+
+                else:
+                    # if not inside_safe_zone:
+                    #     rospy.loginfo("Person outside safe zone.")
+                    # if w <= 50 or h <= 150:
+                    #     rospy.loginfo("Person too far")
+                    # # rospy.loginfo("Car moving...")
+                    rospy.loginfo("Person outside safe zone.")
+                    flag_person_outside = True
+
+                    # cv2.putText(det_annotated, "PERSON DETECTED", (IMAGE_WIDTH // 2 - 450, 100), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
+                    
 
 
         if class_name == "cone":
@@ -225,6 +236,20 @@ def callback(data):
                 # stop_signal_pub.publish(True)
                 # cone_pub.publish(True)
                 rospy.loginfo("Cone Detected!")
+    # Using YOLO detection model
+    if det_image_pub.get_num_connections():
+        # det_result = detection_model(array)
+        # det_annotated = det_result[0].plot(show=False)
+
+        if flag_person_inside:
+            cv2.putText(det_annotated, "PERSON INSIDE", (IMAGE_WIDTH // 2 - 400, 200), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 5)
+
+        elif flag_person_outside:
+            cv2.putText(det_annotated, "PERSON OUTSIDE", (IMAGE_WIDTH // 2 - 400, 200), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
+
+
+        det_image_pub.publish(ros_numpy.msgify(Image, det_annotated, encoding="bgr8"))
+
 
 # rospy.Subscriber("/camera/color/image_raw", Image, callback)
 # rospy.Subscriber("/front_single_camera/image_raw", Image, callback)
