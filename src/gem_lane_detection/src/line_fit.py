@@ -630,7 +630,6 @@ def bird_fit(binary_warped, ret, save_file=None):
 
 
 def final_viz(undist, left_fit, right_fit, m_inv):
-
 	"""
 	Final lane line prediction visualized and overlayed on top of original image
 	"""

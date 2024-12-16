@@ -9,12 +9,13 @@ import rospy
 from line_fit import line_fit, tune_fit, bird_fit, final_viz, viz1
 from Line import Line
 from sensor_msgs.msg import Image
-from std_msgs.msg import Header, Float32MultiArray, Bool
+from std_msgs.msg import Header
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Float32
 from skimage import morphology
 
 import matplotlib.pyplot as plt
+
 
 
 class lanenet_detector():
@@ -23,11 +24,7 @@ class lanenet_detector():
         self.bridge = CvBridge()
         # NOTE
         # Uncomment this line for lane detection of GEM car in Gazebo
-        # # GEMe2
         self.sub_image = rospy.Subscriber('/zed2/zed_node/rgb/image_rect_color', Image, self.img_callback, queue_size=1)
-        # # GEMe4
-        # self.sub_image = rospy.Subscriber('/oak/rgb/image_raw', Image, self.img_callback, queue_size=1)
-
         # Uncomment this line for lane detection of videos in rosbag
         # self.sub_image = rospy.Subscriber('camera/image_raw', Image, self.img_callback, queue_size=1)
 
@@ -35,42 +32,22 @@ class lanenet_detector():
         self.pub_bird = rospy.Publisher("lane_detection/birdseye", Image, queue_size=1)
 
 
-        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
         # self.pub_color_thresh = rospy.Publisher("lane_detection/color_thresh", Image, queue_size=1)
         # self.pub_grad_thresh = rospy.Publisher("lane_detection/grad_thresh", Image, queue_size=1)
         self.pub_combine_thresh = rospy.Publisher("lane_detection/combine_thresh", Image, queue_size=1)
-        ######################################################################################
 
-        self.pub_waypoints = rospy.Publisher('lane_detection/waypoints', Float32MultiArray, queue_size=1)
-        self.waypoints_msg = Float32MultiArray()
-        self.waypoints_msg.data = []
-
-        rospy.Subscriber('/ultralytics_yolo/human_detection/detected', Bool, self.yolo_human_callback)
-        rospy.Subscriber('/ultralytics_yolo/stop_sign_detection/detected', Bool, self.yolo_stopsign_callback)
-        self.detect_human    = False
-        self.detect_stopsign = False
-        self.lane_records    = [0,0]
 
         self.left_line = Line(n=5)
         self.right_line = Line(n=5)
         self.detected = False
         self.hist = True
 
-    def yolo_human_callback(self, msg):
-        self.detect_human = msg.data
-
-    def yolo_stopsign_callback(self, msg):
-        self.detect_stopsign = msg.data
 
     def img_callback(self, data):
 
         try:
             # Convert a ROS image message into an OpenCV image
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
-
-            # plt.imshow(cv_image)
-            # plt.show()
-
         except CvBridgeError as e:
             print(e)
 
@@ -91,13 +68,13 @@ class lanenet_detector():
         raw_img[:, :x_clip] = [60, 60, 60]
         raw_img[:, 4*x_clip:] = [60, 60, 60]
 
-        raw_img[rows-20:, :] = [60, 60, 60]
-
         # cv2.imwrite("test.png", raw_img)
         # time.sleep(10000000)
 
+
+
         #####
-        mask_image, bird_image, waypoints = self.detection(raw_img)
+        mask_image, bird_image = self.detection(raw_img)
 
         if mask_image is not None and bird_image is not None:
             # Convert an OpenCV image into a ROS image message
@@ -107,22 +84,15 @@ class lanenet_detector():
             # Publish image message in ROS
             self.pub_image.publish(out_img_msg)
             self.pub_bird.publish(out_bird_msg)
-
-            # Publish waypoints
-            flat_coordinates = [item for sublist in waypoints for item in sublist]
-            self.waypoints_msg.data = flat_coordinates
-            self.pub_waypoints.publish(self.waypoints_msg)
-            # print("Published coordinates: ", self.waypoints_msg.data)
         #####
 
 
-        ### ===== Uncomment this block to see the result of the three filtered image ===== ###
         ##### Test for each functoin
         # grad_image = self.gradient_thresh(raw_img)
         # colorTH_image = self.color_thresh(raw_img)
 
-        # combine_image = self.combinedBinaryImage(raw_img)
-        # combine_image = (combine_image* 255).astype(np.uint8)
+        combine_image = self.combinedBinaryImage(raw_img)
+        combine_image = (combine_image* 255).astype(np.uint8)
 
         # if grad_image is not None:
         #     out_grad_img_msg = self.bridge.cv2_to_imgmsg(grad_image, 'mono8')
@@ -131,13 +101,13 @@ class lanenet_detector():
         #     out_colorTH_img_msg = self.bridge.cv2_to_imgmsg(colorTH_image, 'mono8')
         #     self.pub_color_thresh.publish(out_colorTH_img_msg)
 
-        # if combine_image is not None:
-        #     out_combine_img_msg = self.bridge.cv2_to_imgmsg(combine_image, 'mono8')
-        #     self.pub_combine_thresh.publish(out_combine_img_msg)
-        ######################################################################################
+        if combine_image is not None:
+            out_combine_img_msg = self.bridge.cv2_to_imgmsg(combine_image, 'mono8')
+            self.pub_combine_thresh.publish(out_combine_img_msg)
 
 
-    def gradient_thresh(self, img, thresh_min=120, thresh_max=300):
+
+    def gradient_thresh(self, img, thresh_min=100, thresh_max=300):
         """
         Apply sobel edge detection on input image in x, y direction
         """
@@ -148,7 +118,7 @@ class lanenet_detector():
         #5. Convert each pixel to unint8, then apply threshold to get binary image
 
         ## TODO
-        # # ===== Sobel Filter =====
+        # # Sobel Filter
         # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # blur = cv2.GaussianBlur(gray, (5,5),0)
 
@@ -161,7 +131,7 @@ class lanenet_detector():
 
         # ret, binary_output = cv2.threshold(grad, 50, 255, cv2.THRESH_BINARY)
         
-        # ===== Canny Edge Detection =====
+        # Canny Edge Detection
         # Convert image to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = self.increase_contrast(gray)
@@ -202,7 +172,6 @@ class lanenet_detector():
         # ret, binary_output = cv2.threshold(GRY, 15, 255, cv2.THRESH_BINARY)
         # # ret, binary_output = cv2.threshold(GRY, 75, 255, cv2.THRESH_BINARY)
 
-        ### CURRENT VERSION ###
         hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
         L = hls[:,:,1]
         contrast_L = self.increase_contrast(L)
@@ -252,8 +221,6 @@ class lanenet_detector():
         binaryImage = np.zeros_like(SobelOutput)
         binaryImage[(ColorOutput==1) & (SobelOutput==1)] = 1
         # binaryImage[(SobelOutput==1)] = 1
-
-        
         # Remove noise from binary image
         binaryImage = morphology.remove_small_objects(binaryImage.astype('bool'),min_size=200,connectivity=2)
         
@@ -283,16 +250,9 @@ class lanenet_detector():
         # rosbag
         # src = np.float32([[cols/2 -95-55, rows/2 +45 ], [cols/2 +95-55, rows/2 +45],\
         #                 [cols/2 -355-55, rows/2 +169], [cols/2 +355-55, rows/2 +169]])
+        # src = np.float32([[510,416],[710,416],[200,717],[1056,717]]) >>> Ortiginal 
 
-        # GEM e2
-        # src = np.float32([[510,416],[710,416],[200,717],[1056,717]])
-        src = np.float32([[540,416],[690,416],[300,717],[960,717]])
-
-        # GEM e4
-        # src = np.float32([[482,416],[657,416],[113,717],[1068,717]])
-
-        # GEM e4 narrow
-        # src = np.float32([[412,516],[757,516],[200,717],[960,717]])
+        src = np.float32([[410,516],[810,516],[200,717],[1056,717]])
 
         dst = np.float32([[0, 0], [cols_b, 0], [0, rows_b], [cols_b, rows_b]])
 
@@ -360,26 +320,14 @@ class lanenet_detector():
             # Annotate original image
             bird_fit_img = None
             combine_fit_img = None
-            waypoints = []
             if ret is not None:
                 bird_fit_img = bird_fit(img_birdeye, ret, save_file=None)
-                combine_fit_img, waypoints = final_viz(img, left_fit, right_fit, Minv)
+                combine_fit_img = final_viz(img, left_fit, right_fit, Minv)
                 # viz1(img, ret)
-
-                # if left_fit is None:
-                #     left_fit = [0, 0, 0]
-                # if right_fit is None:
-                #     right_fit = [0, 0, 0]
-                # linefits = [left_fit[0], left_fit[1], left_fit[2], right_fit[0], right_fit[1], right_fit[2]]
-
-                # linefits = [2.364506304653116e-05, -0.04923174462484201, 223.94522085814225, -5.5157881580171704e-05, 0.026622165839740745, 1161.7379387152469]
-                # print(linefits)
-
-
             else:
                 print("Unable to detect lanes")
 
-            return combine_fit_img, bird_fit_img, waypoints
+            return combine_fit_img, bird_fit_img
 
 
 if __name__ == '__main__':
