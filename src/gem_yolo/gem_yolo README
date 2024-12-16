@@ -1,0 +1,16 @@
+source devel/setup.bash
+
+# Turn on the laptop webcam (Do not need to run on GEM)
+rosrun gem_yolo webcam_node.py
+
+# Run YOLO ROS Node
+rosrun gem_yolo yolo.py
+
+
+===== [INFO of YOLO ROS NODE] =====
+NODE NAME : "ultralytics_yolo"
+
+PUBLISHED TOPICS :
+(1) >>> /ultralytics_yolo/detection/image >>> Annotated Image with YOLO boxes (TYPE=Image)
+(2) >>> /ultralytics_yolo/stop_sign_detection/detected >>> Check if Stop Sign is detected (TYPE=Bool)
+(3) >>> /ultralytics_yolo/human_detection/detected >>> Check if Human is detected (TYPE=Bool)

@@ -1,0 +1,7 @@
+<launch>
+    <!-- Launch the lane detection node -->
+    <!-- <node name="lane_detection" pkg="gem_lane_detection" type="studentVision.py" output="screen" /> -->
+
+    <!-- Launch rviz with a specific configuration file -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find gem_lane_detection)/launch/config.rviz" output="screen" />
+</launch>
