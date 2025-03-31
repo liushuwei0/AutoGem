@@ -1,4 +1,4 @@
-# ECE484-FA24-CTJ-AutoGem_sim
+# Autonomous Driving Software for GEM Electric Vehicle
 
 ### Usage
 
