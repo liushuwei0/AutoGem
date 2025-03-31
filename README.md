@@ -5,12 +5,12 @@
 1. Clone the whole repository
 
    ```
-   git clone https://github.com/htliang517/ECE484-FA24-CTJ-AutoGem_sim.git
+   git clone https://github.com/liushuwei0/AutoGem.git
    ```
 2. Go to current workspace
 
    ```
-   cd ECE484-FA24-CTJ-AutoGem_sim
+   cd AutoGem
    ```
 3. Build the project
 
